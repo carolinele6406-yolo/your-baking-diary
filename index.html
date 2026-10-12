@@ -1,0 +1,3331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Baking Corner</title>
+  <meta name="description" content="A cozy fall baking idea generator. Tap for a new treat, open the full recipe, or add your own.">
+
+  <!-- Fonts: an elegant serif for headings and a soft, readable sans for body text -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://images.pexels.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Mulish:wght@400;600;700&display=swap">
+
+  <!-- =========================================================
+       STYLES
+       Look: a paper recipe card on a warm orange gingham
+       tablecloth. Espresso, maple and cream tones, soft and calm.
+       ========================================================= -->
+  <style>
+    /* ---------- Design tokens ---------- */
+    :root {
+      --espresso: #2e2119;
+      --paper: #fbf6ee;
+      --paper-deep: #f3e9da;
+      --line: #e7d8c3;
+      --maple: #c9862f;
+      --rust: #a4492a;
+      --rust-dark: #87391f;
+      --muted: #7d6656;
+      --cream-text: #fff6e8;
+      --sage: #5f6f4a;
+      --sage-bg: #edf0e4;
+      --error: #a33a2a;
+      --error-bg: #fbe9e3;
+      --shadow-card: 0 24px 50px -22px rgba(90, 40, 15, 0.55);
+      --shadow-soft: 0 14px 30px -18px rgba(90, 40, 15, 0.45);
+      --radius-card: 22px;
+      --radius-soft: 14px;
+      --font-display: "Cormorant Garamond", "Iowan Old Style", Palatino, Georgia, serif;
+      --font-body: "Mulish", "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+
+    /* ---------- Base ---------- */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    /* The whole page is a gingham tablecloth. A small, seamless tile from the
+       photo repeats at its own sharp size, so it never looks stretched or blurry. */
+    body {
+      min-height: 100vh;
+      font-family: var(--font-body);
+      color: var(--espresso);
+      background-color: #f1d8bd; /* Shown while the tablecloth image loads */
+      background-image: url("images/gingham-tile.jpg");
+      background-repeat: repeat;
+      background-size: 220px auto;
+      background-attachment: fixed;
+      line-height: 1.6;
+      cursor: pointer; /* The whole page is clickable for a new treat */
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Falling leaves are drawn on this canvas (see script section 13) */
+    .leaf-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .page {
+      position: relative;
+      z-index: 2;
+      max-width: 580px;
+      margin: 0 auto;
+      padding: 36px 16px 36px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* Cream panels that sit on the tablecloth */
+    .paper-panel {
+      background: rgba(251, 246, 238, 0.95);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-soft);
+    }
+
+    /* ---------- Welcome ---------- */
+    .welcome {
+      text-align: center;
+      padding: 26px 20px 22px;
+      cursor: default;
+    }
+
+    .welcome-eyebrow {
+      margin: 0 0 6px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--rust);
+    }
+
+    .welcome-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: clamp(2.2rem, 8vw, 3.2rem);
+      line-height: 1.05;
+      text-wrap: balance;
+    }
+
+    .welcome-subtitle {
+      margin: 10px auto 0;
+      max-width: 36ch;
+      font-size: 1rem;
+      color: var(--muted);
+    }
+
+    /* ---------- Preferences panel (optional filters) ---------- */
+    .preferences-panel {
+      background: rgba(251, 246, 238, 0.95);
+      border-radius: var(--radius-soft);
+      box-shadow: var(--shadow-soft);
+      cursor: default;
+    }
+
+    .preferences-summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 13px 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--espresso);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: var(--radius-soft);
+    }
+
+    .preferences-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .preferences-summary::after {
+      content: "+";
+      font-size: 1.25rem;
+      font-weight: 400;
+      color: var(--muted);
+      transition: transform 0.2s ease;
+    }
+
+    .preferences-panel[open] .preferences-summary::after {
+      transform: rotate(45deg);
+    }
+
+    .preferences-summary:focus-visible {
+      outline: 2px solid var(--maple);
+      outline-offset: 2px;
+    }
+
+    .preferences-form {
+      padding: 2px 18px 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    /* ---------- Shared form styles (filters + add-recipe form) ---------- */
+    .form-row {
+      display: grid;
+      gap: 6px;
+    }
+
+    .form-row-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .form-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .form-label .optional {
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--muted);
+      opacity: 0.8;
+    }
+
+    .form-hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .form-select,
+    .form-input,
+    .form-textarea {
+      width: 100%;
+      font: inherit;
+      font-size: 1rem;
+      color: var(--espresso);
+      background: #fffdf9;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+
+    .form-input,
+    .form-textarea {
+      cursor: text;
+    }
+
+    .form-textarea {
+      min-height: 140px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    .form-select:focus-visible,
+    .form-input:focus-visible,
+    .form-textarea:focus-visible {
+      outline: 2px solid var(--maple);
+      outline-offset: 1px;
+      border-color: var(--maple);
+    }
+
+    .form-input[aria-invalid="true"],
+    .form-select[aria-invalid="true"],
+    .form-textarea[aria-invalid="true"] {
+      border-color: var(--error);
+      background: var(--error-bg);
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+
+    .checkbox-row input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--rust);
+      cursor: pointer;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* Inline error messages */
+    .error-message {
+      margin: 0;
+      padding: 10px 12px;
+      font-size: 0.88rem;
+      color: var(--error);
+      background: var(--error-bg);
+      border-radius: 10px;
+    }
+
+    .field-error {
+      margin: 0;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--error);
+    }
+
+    /* Friendly success note */
+    .success-message {
+      margin: 0;
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      color: var(--sage);
+      background: var(--sage-bg);
+      border-radius: 10px;
+    }
+
+    /* ---------- Treat card ---------- */
+    .treat-card {
+      background: var(--paper);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+    }
+
+    /* Big photo at the top of the card, with the name laid over it */
+    .treat-hero {
+      position: relative;
+    }
+
+    .treat-photo-frame {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      max-height: 440px;
+    }
+
+    .treat-hero-caption {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 60px 22px 18px;
+      background: linear-gradient(180deg, rgba(20, 12, 6, 0) 0%, rgba(20, 12, 6, 0.72) 100%);
+      color: var(--cream-text);
+      pointer-events: none;
+    }
+
+    .treat-intro {
+      margin: 0 0 2px;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 1.15rem;
+      color: #f4cf8f;
+    }
+
+    .treat-name {
+      margin: 0;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: clamp(1.75rem, 6.5vw, 2.3rem);
+      line-height: 1.1;
+      text-wrap: balance;
+      text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+    }
+
+    .treat-body {
+      padding: 18px 22px 24px;
+      text-align: center;
+    }
+
+    .treat-category {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--rust);
+      margin-bottom: 6px;
+    }
+
+    .treat-blurb {
+      margin: 0 auto 14px;
+      max-width: 40ch;
+      color: var(--muted);
+    }
+
+    .treat-meta {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 20px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .treat-meta li {
+      font-size: 0.82rem;
+      font-weight: 600;
+      background: var(--paper-deep);
+      color: var(--espresso);
+      border-radius: 999px;
+      padding: 4px 12px;
+    }
+
+    .treat-question {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin: 0 0 12px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .treat-actions {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    /* Gentle fade each time a new treat appears */
+    .fade-in {
+      animation: fadeUp 0.5s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ---------- Photo frames (card + recipe) ---------- */
+    .photo-frame {
+      position: relative;
+      overflow: hidden;
+      background: var(--paper-deep);
+    }
+
+    .photo-frame img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: opacity 0.45s ease;
+    }
+
+    /* While a photo loads: hide it and show a soft shimmer */
+    .photo-frame.is-loading img {
+      opacity: 0;
+    }
+
+    .photo-frame.is-loading::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(100deg, var(--paper-deep) 30%, #faf1e4 50%, var(--paper-deep) 70%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s linear infinite;
+    }
+
+    @keyframes shimmer {
+      from { background-position: 100% 0; }
+      to   { background-position: -100% 0; }
+    }
+
+    /* Drawing shown when a recipe has no photo, or a photo can't load */
+    .photo-frame.is-fallback {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 45%, #fbeedd 0%, var(--paper-deep) 75%);
+    }
+
+    .photo-frame.is-fallback svg {
+      width: min(260px, 64%);
+      height: auto;
+      margin-bottom: 40px;
+    }
+
+    /* ---------- Buttons ---------- */
+    .button {
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 12px 22px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background-color 0.2s ease, color 0.2s ease, transform 0.1s ease;
+    }
+
+    .button:active {
+      transform: scale(0.98);
+    }
+
+    .button:focus-visible {
+      outline: 2px solid var(--maple);
+      outline-offset: 3px;
+    }
+
+    .button-primary {
+      background: var(--rust);
+      color: #fff8ef;
+    }
+
+    .button-primary:hover {
+      background: var(--rust-dark);
+    }
+
+    .button-secondary {
+      background: transparent;
+      color: var(--espresso);
+      border-color: var(--line);
+    }
+
+    .button-secondary:hover {
+      background: var(--paper-deep);
+    }
+
+    .button-quiet {
+      background: transparent;
+      color: var(--error);
+      border-color: transparent;
+      padding-left: 6px;
+      padding-right: 6px;
+      margin-right: auto;
+    }
+
+    .button-quiet:hover {
+      text-decoration: underline;
+    }
+
+    /* ---------- "Add your own recipe" invitation ---------- */
+    .add-invite {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px 16px;
+      padding: 18px 20px;
+      cursor: default;
+    }
+
+    .add-invite-text {
+      min-width: 0;
+      flex: 1 1 220px;
+    }
+
+    .add-invite-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .add-invite-copy {
+      margin: 2px 0 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    /* ---------- Footer notes ---------- */
+    .page-footer {
+      align-self: center;
+      max-width: 100%;
+      padding: 10px 18px;
+      text-align: center;
+      border-radius: var(--radius-soft);
+    }
+
+    .click-hint {
+      margin: 0;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .photo-credit {
+      margin: 2px 0 0;
+      font-size: 0.76rem;
+      color: var(--muted);
+    }
+
+    .photo-credit a {
+      color: inherit;
+    }
+
+    /* ---------- Dialogs (recipe + add recipe) ---------- */
+    .recipe-dialog {
+      width: min(660px, calc(100vw - 32px));
+      max-height: calc(100vh - 48px);
+      padding: 0;
+      border: none;
+      border-radius: var(--radius-card);
+      background: var(--paper);
+      color: var(--espresso);
+      box-shadow: 0 30px 70px -20px rgba(40, 18, 6, 0.6);
+      cursor: default;
+    }
+
+    .recipe-dialog::backdrop {
+      background: rgba(46, 24, 10, 0.5);
+      backdrop-filter: blur(3px);
+    }
+
+    .recipe-hero {
+      position: relative;
+    }
+
+    .recipe-photo-frame {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+    }
+
+    .close-button {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(251, 246, 238, 0.92);
+      color: var(--espresso);
+      font-size: 1.4rem;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+    }
+
+    .close-button:focus-visible {
+      outline: 2px solid var(--maple);
+      outline-offset: 2px;
+    }
+
+    .recipe-content {
+      padding: 22px 26px 26px;
+    }
+
+    .recipe-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: clamp(1.7rem, 6vw, 2.2rem);
+      line-height: 1.1;
+      text-wrap: balance;
+    }
+
+    .recipe-blurb {
+      color: var(--muted);
+      margin: 8px 0 14px;
+    }
+
+    .recipe-meta {
+      justify-content: flex-start;
+      margin-bottom: 0;
+    }
+
+    .recipe-section-title {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1.35rem;
+      margin: 24px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .ingredient-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 6px;
+    }
+
+    .ingredient-list li {
+      position: relative;
+      padding-left: 20px;
+    }
+
+    /* Small maple dot instead of a default bullet */
+    .ingredient-list li::before {
+      content: "";
+      position: absolute;
+      left: 4px;
+      top: 0.65em;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--maple);
+    }
+
+    .step-list {
+      padding-left: 0;
+      margin: 0;
+      list-style: none;
+      counter-reset: step;
+      display: grid;
+      gap: 12px;
+    }
+
+    .step-list li {
+      counter-increment: step;
+      position: relative;
+      padding-left: 42px;
+    }
+
+    .step-list li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--rust);
+      color: #fff8ef;
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .recipe-tip {
+      margin: 22px 0 0;
+      padding: 14px 16px;
+      border-radius: var(--radius-soft);
+      background: var(--paper-deep);
+      font-size: 0.95rem;
+    }
+
+    .recipe-footer {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    /* ---------- Add-recipe dialog ---------- */
+    .dialog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .dialog-header .close-button {
+      position: static;
+      flex-shrink: 0;
+      box-shadow: none;
+      background: var(--paper-deep);
+    }
+
+    .add-recipe-form {
+      display: grid;
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .preview-intro {
+      margin: 6px 0 0;
+      color: var(--muted);
+    }
+
+    /* "What we tidied" and "Things to check" boxes in the preview */
+    .polish-box {
+      margin: 16px 0 0;
+      padding: 14px 16px;
+      border-radius: var(--radius-soft);
+    }
+
+    .polish-box h3 {
+      margin: 0 0 6px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .polish-box ul {
+      margin: 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 4px;
+      font-size: 0.92rem;
+    }
+
+    .polish-box-done {
+      background: var(--sage-bg);
+      color: var(--sage);
+    }
+
+    .polish-box-check {
+      background: #fbf0dc;
+      color: #7a4d14;
+    }
+
+    .preview-card {
+      margin-top: 18px;
+      padding: 18px 18px 20px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-soft);
+      background: #fffdf9;
+    }
+
+    .preview-card .recipe-title {
+      font-size: clamp(1.5rem, 5vw, 1.9rem);
+    }
+
+    .preview-card .recipe-section-title {
+      margin-top: 18px;
+    }
+
+    /* ---------- Responsive tweaks ---------- */
+    @media (max-width: 480px) {
+      .page {
+        padding-top: 24px;
+      }
+
+      .treat-body {
+        padding: 16px 16px 20px;
+      }
+
+      .treat-hero-caption {
+        padding: 50px 16px 14px;
+      }
+
+      .treat-actions .button,
+      .recipe-footer .button,
+      .add-invite .button {
+        flex: 1 1 100%;
+      }
+
+      .recipe-content {
+        padding: 18px 18px 20px;
+      }
+
+      .form-row-pair {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Respect users who prefer less motion */
+    @media (prefers-reduced-motion: reduce) {
+      .fade-in,
+      .photo-frame.is-loading::before {
+        animation: none;
+      }
+
+      .button,
+      .preferences-summary::after,
+      .photo-frame img {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Golden leaves drift over the tablecloth (decorative) -->
+  <canvas class="leaf-canvas" id="leaf-canvas" aria-hidden="true"></canvas>
+
+  <!-- =========================================================
+       PAGE LAYOUT
+       ========================================================= -->
+  <main class="page">
+
+    <!-- Welcome message -->
+    <header class="welcome paper-panel">
+      <p class="welcome-eyebrow">Fall baking ideas</p>
+      <h1 class="welcome-title">Welcome to the Baking Corner</h1>
+      <p class="welcome-subtitle">Pull up a chair and grab something warm to sip. A sweet little idea is waiting just for you.</p>
+    </header>
+
+    <!-- Optional preferences. If nothing is chosen, a fully random treat is shown. -->
+    <details class="preferences-panel" id="preferences-panel">
+      <summary class="preferences-summary">Craving something specific? (optional)</summary>
+
+      <form class="preferences-form" id="preferences-form" novalidate>
+        <div class="form-row">
+          <label class="form-label" for="type-select">Type of treat</label>
+          <select class="form-select" id="type-select" name="type">
+            <option value="any">Surprise me</option>
+            <option value="cookies">Cookies</option>
+            <option value="bars">Brownies &amp; Bars</option>
+            <option value="cakes">Cakes</option>
+            <option value="breads">Breads, Muffins &amp; Scones</option>
+            <option value="pies">Pies &amp; Pastries</option>
+            <option value="mine">My own recipes</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label class="form-label" for="ingredient-input">Favorite ingredient</label>
+          <input
+            class="form-input"
+            id="ingredient-input"
+            name="ingredient"
+            type="text"
+            maxlength="30"
+            autocomplete="off"
+            placeholder="e.g. pumpkin, apple, chocolate"
+            aria-describedby="ingredient-hint preferences-error">
+          <p class="form-hint" id="ingredient-hint">Leave blank for any ingredient.</p>
+        </div>
+
+        <label class="checkbox-row" for="fall-checkbox">
+          <input type="checkbox" id="fall-checkbox" name="fallOnly">
+          Fall favorites only
+        </label>
+
+        <p class="error-message" id="preferences-error" role="alert" hidden></p>
+
+        <div class="form-actions">
+          <button class="button button-primary" type="submit" id="find-treat-button">Find my treat</button>
+          <button class="button button-secondary" type="button" id="clear-preferences-button">Clear</button>
+        </div>
+      </form>
+    </details>
+
+    <!-- The suggested treat. aria-live announces each new suggestion to screen readers. -->
+    <section class="treat-card" id="treat-card" aria-live="polite" aria-labelledby="treat-name">
+      <div id="treat-content">
+        <div class="treat-hero">
+          <div class="photo-frame treat-photo-frame" id="treat-photo-frame"></div>
+          <div class="treat-hero-caption">
+            <p class="treat-intro" id="treat-intro">Your cozy little bake is…</p>
+            <h2 class="treat-name" id="treat-name"></h2>
+          </div>
+        </div>
+
+        <div class="treat-body">
+          <span class="treat-category" id="treat-category"></span>
+          <p class="treat-blurb" id="treat-blurb"></p>
+          <ul class="treat-meta" id="treat-meta"></ul>
+
+          <p class="treat-question">Would you like the recipe for this?</p>
+          <div class="treat-actions">
+            <button class="button button-primary" type="button" id="recipe-yes-button">Yes, please!</button>
+            <button class="button button-secondary" type="button" id="recipe-no-button">Not today, show me another</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Invitation to add a recipe of your own -->
+    <section class="add-invite paper-panel" aria-labelledby="add-invite-title">
+      <div class="add-invite-text">
+        <h2 class="add-invite-title" id="add-invite-title">Have a family favorite?</h2>
+        <p class="add-invite-copy">Add your own recipe. We'll tidy it up and mix it into your random picks.</p>
+      </div>
+      <button class="button button-primary" type="button" id="open-add-recipe-button">Add your own recipe</button>
+    </section>
+    <p class="success-message" id="add-success-message" role="status" hidden></p>
+
+    <footer class="page-footer paper-panel">
+      <p class="click-hint">Tap anywhere on the tablecloth for a new treat</p>
+      <p class="photo-credit">Treat photos from <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a>. Each photo shows a similar bake, so yours may look a little different.</p>
+    </footer>
+  </main>
+
+  <!-- =========================================================
+       RECIPE DIALOG (opens when the user clicks "Yes, please!")
+       ========================================================= -->
+  <dialog class="recipe-dialog" id="recipe-dialog" aria-labelledby="recipe-title">
+    <div class="recipe-hero">
+      <div class="photo-frame recipe-photo-frame" id="recipe-photo-frame"></div>
+      <button class="close-button" type="button" id="recipe-close-button" aria-label="Close recipe">×</button>
+    </div>
+
+    <div class="recipe-content">
+      <h2 class="recipe-title" id="recipe-title"></h2>
+      <p class="recipe-blurb" id="recipe-blurb"></p>
+      <ul class="treat-meta recipe-meta" id="recipe-meta"></ul>
+
+      <h3 class="recipe-section-title">Ingredients</h3>
+      <ul class="ingredient-list" id="recipe-ingredients"></ul>
+
+      <h3 class="recipe-section-title">Steps</h3>
+      <ol class="step-list" id="recipe-steps"></ol>
+
+      <p class="recipe-tip" id="recipe-tip"></p>
+
+      <div class="recipe-footer">
+        <!-- Only shown for recipes the visitor added themselves -->
+        <button class="button button-quiet" type="button" id="recipe-remove-button" hidden>Remove this recipe</button>
+        <button class="button button-secondary" type="button" id="recipe-another-button">Show me another treat</button>
+        <button class="button button-primary" type="button" id="recipe-done-button">Happy baking!</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- =========================================================
+       ADD-RECIPE DIALOG
+       Step 1: the form. Step 2: a polished preview to confirm.
+       ========================================================= -->
+  <dialog class="recipe-dialog" id="add-recipe-dialog" aria-labelledby="add-recipe-title">
+    <div class="recipe-content">
+
+      <!-- Step 1: write the recipe -->
+      <div id="add-step-form">
+        <div class="dialog-header">
+          <h2 class="recipe-title" id="add-recipe-title">Add your own recipe</h2>
+          <button class="close-button" type="button" id="add-close-button" aria-label="Close without saving">×</button>
+        </div>
+        <p class="preview-intro">Write it however feels natural. Next you'll see a tidied-up version to check before it's saved.</p>
+
+        <form class="add-recipe-form" id="add-recipe-form" novalidate>
+          <div class="form-row">
+            <label class="form-label" for="add-name">Recipe name</label>
+            <input class="form-input" id="add-name" name="name" type="text" maxlength="60" autocomplete="off"
+              placeholder="e.g. grandma's apple crisp" aria-describedby="add-name-error">
+            <p class="field-error" id="add-name-error" hidden></p>
+          </div>
+
+          <div class="form-row-pair">
+            <div class="form-row">
+              <label class="form-label" for="add-type">Type of treat</label>
+              <select class="form-select" id="add-type" name="type" aria-describedby="add-type-error">
+                <option value="">Choose one</option>
+                <option value="cookies">Cookies</option>
+                <option value="bars">Brownies &amp; Bars</option>
+                <option value="cakes">Cakes</option>
+                <option value="breads">Breads, Muffins &amp; Scones</option>
+                <option value="pies">Pies &amp; Pastries</option>
+              </select>
+              <p class="field-error" id="add-type-error" hidden></p>
+            </div>
+
+            <div class="form-row">
+              <span class="form-label">Season</span>
+              <label class="checkbox-row" for="add-fall">
+                <input type="checkbox" id="add-fall" name="fall">
+                It's a fall favorite
+              </label>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label" for="add-blurb">Short description <span class="optional">(optional)</span></label>
+            <input class="form-input" id="add-blurb" name="blurb" type="text" maxlength="160" autocomplete="off"
+              placeholder="What makes it special?" aria-describedby="add-blurb-error">
+            <p class="field-error" id="add-blurb-error" hidden></p>
+          </div>
+
+          <div class="form-row-pair">
+            <div class="form-row">
+              <label class="form-label" for="add-time">Total time <span class="optional">(optional)</span></label>
+              <input class="form-input" id="add-time" name="time" type="text" maxlength="30" autocomplete="off"
+                placeholder="e.g. 45 mins" aria-describedby="add-time-error">
+              <p class="field-error" id="add-time-error" hidden></p>
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="add-yield">Makes <span class="optional">(optional)</span></label>
+              <input class="form-input" id="add-yield" name="yield" type="text" maxlength="40" autocomplete="off"
+                placeholder="e.g. 12 cookies" aria-describedby="add-yield-error">
+              <p class="field-error" id="add-yield-error" hidden></p>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label" for="add-ingredients">Ingredients</label>
+            <textarea class="form-textarea" id="add-ingredients" name="ingredients" maxlength="3000"
+              placeholder="One per line, for example:&#10;2 1/2 cups flour&#10;1 tsp baking soda&#10;- 3 apples, sliced"
+              aria-describedby="add-ingredients-hint add-ingredients-error"></textarea>
+            <p class="form-hint" id="add-ingredients-hint">Put each ingredient on its own line. At least 2.</p>
+            <p class="field-error" id="add-ingredients-error" hidden></p>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label" for="add-steps">Steps</label>
+            <textarea class="form-textarea" id="add-steps" name="steps" maxlength="5000"
+              placeholder="One step per line, for example:&#10;preheat oven to 350 degrees&#10;mix the butter and sugar&#10;bake 25 mins"
+              aria-describedby="add-steps-hint add-steps-error"></textarea>
+            <p class="form-hint" id="add-steps-hint">Put each step on its own line. At least 2.</p>
+            <p class="field-error" id="add-steps-error" hidden></p>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label" for="add-tip">Baker's tip <span class="optional">(optional)</span></label>
+            <input class="form-input" id="add-tip" name="tip" type="text" maxlength="200" autocomplete="off"
+              placeholder="A secret that makes it turn out great" aria-describedby="add-tip-error">
+            <p class="field-error" id="add-tip-error" hidden></p>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label" for="add-photo">Photo link <span class="optional">(optional)</span></label>
+            <input class="form-input" id="add-photo" name="photo" type="url" maxlength="500" autocomplete="off"
+              placeholder="https://…" aria-describedby="add-photo-hint add-photo-error">
+            <p class="form-hint" id="add-photo-hint">Paste a link to a photo online. Without one, we'll use a drawing.</p>
+            <p class="field-error" id="add-photo-error" hidden></p>
+          </div>
+
+          <p class="error-message" id="add-form-error" role="alert" hidden></p>
+
+          <div class="form-actions">
+            <button class="button button-primary" type="submit" id="add-preview-button">Tidy up &amp; preview</button>
+            <button class="button button-secondary" type="button" id="add-cancel-button">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Step 2: check the polished version -->
+      <div id="add-step-preview" hidden>
+        <div class="dialog-header">
+          <h2 class="recipe-title" id="preview-heading" tabindex="-1">Here's your recipe, tidied up</h2>
+        </div>
+        <p class="preview-intro">Have a quick look. You can go back and edit anything before saving.</p>
+
+        <div class="polish-box polish-box-done" id="polish-done-box">
+          <h3>What we tidied</h3>
+          <ul id="polish-done-list"></ul>
+        </div>
+
+        <div class="polish-box polish-box-check" id="polish-check-box">
+          <h3>Worth a second look</h3>
+          <ul id="polish-check-list"></ul>
+        </div>
+
+        <div class="preview-card">
+          <h3 class="recipe-title" id="preview-title"></h3>
+          <p class="recipe-blurb" id="preview-blurb"></p>
+          <ul class="treat-meta recipe-meta" id="preview-meta"></ul>
+
+          <h4 class="recipe-section-title">Ingredients</h4>
+          <ul class="ingredient-list" id="preview-ingredients"></ul>
+
+          <h4 class="recipe-section-title">Steps</h4>
+          <ol class="step-list" id="preview-steps"></ol>
+
+          <p class="recipe-tip" id="preview-tip" hidden></p>
+        </div>
+
+        <p class="error-message" id="add-save-error" role="alert" hidden></p>
+
+        <div class="recipe-footer">
+          <button class="button button-secondary" type="button" id="add-back-button">Back to edit</button>
+          <button class="button button-primary" type="button" id="add-save-button">Add to my recipes</button>
+        </div>
+      </div>
+
+    </div>
+  </dialog>
+
+  <!-- =========================================================
+       SCRIPT
+       ========================================================= -->
+  <script>
+    "use strict";
+
+    /* ---------------------------------------------------------
+       1. RECIPE DATA
+       Classic, well-tested proportions with a cozy fall twist.
+       Each recipe has an "art" object describing its illustration.
+       --------------------------------------------------------- */
+    const RECIPES = [
+      {
+        id: "pumpkin-spice-snickerdoodles",
+        name: "Pumpkin Spice Snickerdoodles",
+        category: "cookies",
+        fall: true,
+        art: { type: "cookie", base: "#e2b178", edge: "#b67a45", dot: "#c98a4e", dotSize: 3 },
+        blurb: "Soft, chewy snickerdoodles rolled in pumpkin-spiced sugar. Like a sweater in cookie form.",
+        time: "35 min",
+        yield: "About 30 cookies",
+        level: "Easy",
+        ingredients: [
+          "2 ¾ cups (345 g) all-purpose flour",
+          "2 tsp cream of tartar",
+          "1 tsp baking soda",
+          "¼ tsp salt",
+          "2 tsp pumpkin pie spice",
+          "1 cup (226 g) unsalted butter, softened",
+          "1 ½ cups (300 g) granulated sugar",
+          "2 large eggs, room temperature",
+          "1 tsp vanilla extract",
+          "For rolling: ¼ cup (50 g) sugar + 1 tbsp pumpkin pie spice"
+        ],
+        steps: [
+          "Heat the oven to 400°F (200°C) and line two baking sheets with parchment paper.",
+          "In a bowl, whisk together the flour, cream of tartar, baking soda, salt and 2 tsp pumpkin pie spice.",
+          "In a large bowl, beat the butter and 1 ½ cups sugar for about 2 minutes until pale and fluffy.",
+          "Beat in the eggs one at a time, then the vanilla.",
+          "Add the dry ingredients and mix on low just until no streaks of flour remain.",
+          "Stir the rolling sugar and spice together in a small bowl.",
+          "Scoop dough into 1 ½-inch balls, roll each one in the spiced sugar and place 2 inches apart.",
+          "Bake 8–10 minutes, until the edges are set but the centers still look soft.",
+          "Let cool on the sheet for 5 minutes, then move to a wire rack."
+        ],
+        tip: "Pull them out while the centers look slightly underdone — they firm up as they cool and stay chewy."
+      },
+      {
+        id: "brown-butter-chocolate-chip-cookies",
+        name: "Brown Butter Chocolate Chip Cookies",
+        category: "cookies",
+        fall: false,
+        art: { type: "cookie", base: "#d9a066", edge: "#a8683a", dot: "#5a3522", dotSize: 6 },
+        blurb: "Toasty, nutty brown butter turns a classic into something extra cozy.",
+        time: "45 min (+ cooling)",
+        yield: "About 20 cookies",
+        level: "Easy",
+        ingredients: [
+          "¾ cup (170 g) unsalted butter",
+          "1 cup (200 g) packed brown sugar",
+          "¼ cup (50 g) granulated sugar",
+          "1 large egg + 1 egg yolk",
+          "2 tsp vanilla extract",
+          "2 cups (250 g) all-purpose flour",
+          "½ tsp baking soda",
+          "½ tsp salt",
+          "1 ½ cups (255 g) semisweet chocolate chips",
+          "Flaky sea salt, for topping (optional)"
+        ],
+        steps: [
+          "Melt the butter in a light-colored pan over medium heat. Keep swirling until it foams and smells nutty and the bits at the bottom turn golden brown (about 5 minutes).",
+          "Pour the browned butter, including the brown bits, into a large bowl and let it cool for 15 minutes.",
+          "Heat the oven to 350°F (175°C) and line baking sheets with parchment.",
+          "Whisk both sugars into the cooled butter, then whisk in the egg, yolk and vanilla until glossy.",
+          "Stir in the flour, baking soda and salt until just combined, then fold in the chocolate chips.",
+          "Scoop 2-tablespoon balls of dough onto the sheets, 2 inches apart.",
+          "Bake 10–12 minutes until the edges are golden and the centers look set but soft.",
+          "Sprinkle with flaky salt while warm and let cool on the sheet for 5 minutes."
+        ],
+        tip: "If the dough feels very soft, chill it for 30 minutes so the cookies don't spread too much."
+      },
+      {
+        id: "maple-oatmeal-cookies",
+        name: "Maple Glazed Oatmeal Cookies",
+        category: "cookies",
+        fall: true,
+        art: { type: "cookie", base: "#d8ad78", edge: "#a87848", dot: "#efd8b0", dotSize: 4, glaze: "#f6e7cf" },
+        blurb: "Chewy oatmeal cookies sweetened with real maple syrup and finished with a maple glaze.",
+        time: "35 min",
+        yield: "About 18 cookies",
+        level: "Easy",
+        ingredients: [
+          "½ cup (113 g) unsalted butter, softened",
+          "½ cup (100 g) packed brown sugar",
+          "¼ cup (60 ml) pure maple syrup",
+          "1 large egg",
+          "1 tsp vanilla extract",
+          "1 cup (125 g) all-purpose flour",
+          "½ tsp baking soda",
+          "½ tsp ground cinnamon",
+          "¼ tsp salt",
+          "1 ½ cups (135 g) old-fashioned rolled oats",
+          "Glaze: ½ cup (60 g) powdered sugar + 1–2 tbsp maple syrup"
+        ],
+        steps: [
+          "Heat the oven to 350°F (175°C) and line two baking sheets with parchment.",
+          "Beat the butter and brown sugar until creamy, then beat in the maple syrup, egg and vanilla.",
+          "Add the flour, baking soda, cinnamon and salt and mix on low until combined.",
+          "Stir in the oats.",
+          "Scoop 1 ½-tablespoon mounds onto the sheets, 2 inches apart, and flatten them slightly.",
+          "Bake 10–12 minutes until the edges are golden.",
+          "Cool for 5 minutes on the sheet, then move to a rack to cool completely.",
+          "Whisk the powdered sugar with maple syrup until drizzly and zigzag it over the cooled cookies."
+        ],
+        tip: "Use pure maple syrup, not pancake syrup — the flavor is much richer."
+      },
+      {
+        id: "molasses-ginger-crinkles",
+        name: "Molasses Ginger Crinkle Cookies",
+        category: "cookies",
+        fall: true,
+        art: { type: "cookie", base: "#9b6236", edge: "#6e4022", dot: "#f3e6d3", dotSize: 3 },
+        blurb: "Deeply spiced, chewy cookies with a sparkly sugar crackle on top.",
+        time: "30 min",
+        yield: "About 24 cookies",
+        level: "Easy",
+        ingredients: [
+          "¾ cup (170 g) unsalted butter, softened",
+          "1 cup (200 g) granulated sugar, plus ⅓ cup for rolling",
+          "1 large egg",
+          "¼ cup (60 ml) unsulphured molasses",
+          "2 cups (250 g) all-purpose flour",
+          "2 tsp baking soda",
+          "¼ tsp salt",
+          "2 tsp ground ginger",
+          "1 tsp ground cinnamon",
+          "½ tsp ground cloves"
+        ],
+        steps: [
+          "Heat the oven to 350°F (175°C) and line baking sheets with parchment.",
+          "Beat the butter and 1 cup sugar until fluffy, then beat in the egg and molasses.",
+          "Whisk the flour, baking soda, salt and spices together, then mix into the wet ingredients until a soft dough forms.",
+          "Roll the dough into 1 ¼-inch balls and roll each one in the extra sugar.",
+          "Place 2 inches apart and bake 9–11 minutes, until the tops crackle.",
+          "Cool on the sheet for 5 minutes, then move to a rack."
+        ],
+        tip: "For the prettiest crinkles, roll the balls in sugar twice."
+      },
+      {
+        id: "pumpkin-chocolate-chip-cookies",
+        name: "Soft Pumpkin Chocolate Chip Cookies",
+        category: "cookies",
+        fall: true,
+        art: { type: "cookie", base: "#e09a52", edge: "#b8703a", dot: "#4f2f1e", dotSize: 5 },
+        blurb: "Pillowy, cake-like cookies full of pumpkin and melty chocolate chips.",
+        time: "30 min",
+        yield: "About 36 cookies",
+        level: "Easy",
+        ingredients: [
+          "1 cup (245 g) canned pumpkin purée (not pie filling)",
+          "1 cup (200 g) granulated sugar",
+          "½ cup (120 ml) vegetable oil",
+          "1 large egg",
+          "1 tsp vanilla extract",
+          "2 cups (250 g) all-purpose flour",
+          "2 tsp baking powder",
+          "1 tsp ground cinnamon",
+          "½ tsp salt",
+          "1 tsp baking soda dissolved in 1 tsp milk",
+          "2 cups (340 g) semisweet chocolate chips"
+        ],
+        steps: [
+          "Heat the oven to 350°F (175°C) and line baking sheets with parchment.",
+          "Whisk the pumpkin, sugar, oil, egg and vanilla in a large bowl until smooth.",
+          "In another bowl, whisk the flour, baking powder, cinnamon and salt.",
+          "Stir the baking soda–milk mixture into the pumpkin mixture.",
+          "Add the dry ingredients and stir just until combined, then fold in the chocolate chips.",
+          "Drop rounded tablespoons of dough onto the sheets.",
+          "Bake about 10–12 minutes until the tops spring back when lightly touched.",
+          "Cool on a wire rack."
+        ],
+        tip: "These are soft and cakey by design — store them in a single layer so they don't stick together."
+      },
+      {
+        id: "brown-sugar-shortbread",
+        name: "Brown Sugar Shortbread",
+        category: "cookies",
+        fall: false,
+        art: { type: "cookie", base: "#e9c48f", edge: "#c39258", dot: "#c79a62", dotSize: 2.5 },
+        blurb: "Just five ingredients for a buttery, melt-in-your-mouth cookie with caramel notes.",
+        time: "45 min",
+        yield: "16 wedges",
+        level: "Easy",
+        ingredients: [
+          "1 cup (226 g) salted butter, softened",
+          "½ cup (100 g) packed light brown sugar",
+          "1 tsp vanilla extract",
+          "2 cups (250 g) all-purpose flour",
+          "¼ tsp salt (use ½ tsp if your butter is unsalted)"
+        ],
+        steps: [
+          "Heat the oven to 325°F (165°C). Lightly grease a 9-inch round cake pan.",
+          "Beat the butter, brown sugar and vanilla until smooth and creamy.",
+          "Add the flour and salt and mix on low until the dough just comes together.",
+          "Press the dough evenly into the pan and prick all over with a fork.",
+          "Bake 30–35 minutes until golden at the edges.",
+          "While still warm, cut into 16 wedges with a sharp knife.",
+          "Let cool completely in the pan before removing."
+        ],
+        tip: "Cutting while warm is key — once it cools, shortbread snaps instead of slicing cleanly."
+      },
+      {
+        id: "classic-fudgy-brownies",
+        name: "Classic Fudgy Brownies",
+        category: "bars",
+        fall: false,
+        art: { type: "brownie", top: "#6b3f2a", front: "#55301f", side: "#43261a" },
+        blurb: "One bowl, simple pantry ingredients and that perfect crackly top.",
+        time: "35 min",
+        yield: "16 small squares",
+        level: "Easy",
+        ingredients: [
+          "½ cup (113 g) unsalted butter, melted",
+          "1 cup (200 g) granulated sugar",
+          "2 large eggs",
+          "1 tsp vanilla extract",
+          "⅓ cup (30 g) unsweetened cocoa powder",
+          "½ cup (63 g) all-purpose flour",
+          "¼ tsp salt",
+          "¼ tsp baking powder"
+        ],
+        steps: [
+          "Heat the oven to 350°F (175°C). Grease an 8x8-inch pan and line it with parchment.",
+          "Whisk the melted butter and sugar together, then whisk in the eggs and vanilla until glossy.",
+          "Sift in the cocoa, flour, salt and baking powder and fold just until combined.",
+          "Spread the batter evenly in the pan.",
+          "Bake 20–25 minutes, until a toothpick comes out with a few moist crumbs.",
+          "Cool completely in the pan before cutting."
+        ],
+        tip: "Whisk the eggs and sugar really well — that's what creates the shiny, crackly top."
+      },
+      {
+        id: "pumpkin-cheesecake-brownies",
+        name: "Pumpkin Cheesecake Swirl Brownies",
+        category: "bars",
+        fall: true,
+        art: { type: "brownie", top: "#6b3f2a", front: "#55301f", side: "#43261a", swirl: "#e7a55e" },
+        blurb: "Fudgy chocolate brownies marbled with a creamy pumpkin cheesecake ribbon.",
+        time: "50 min",
+        yield: "16 squares",
+        level: "Medium",
+        ingredients: [
+          "Brownie: ½ cup (113 g) unsalted butter, melted",
+          "1 cup (200 g) granulated sugar",
+          "2 large eggs",
+          "1 tsp vanilla extract",
+          "⅓ cup (30 g) unsweetened cocoa powder",
+          "½ cup (63 g) all-purpose flour",
+          "¼ tsp salt",
+          "Swirl: 4 oz (113 g) cream cheese, softened",
+          "⅓ cup (80 g) canned pumpkin purée",
+          "2 tbsp granulated sugar",
+          "1 egg yolk",
+          "½ tsp pumpkin pie spice"
+        ],
+        steps: [
+          "Heat the oven to 350°F (175°C). Grease and line an 8x8-inch pan with parchment.",
+          "Make the brownie batter: whisk the melted butter and sugar, then the eggs and vanilla. Fold in the cocoa, flour and salt.",
+          "In another bowl, beat the cream cheese until smooth, then beat in the pumpkin, sugar, egg yolk and spice.",
+          "Spread about ¾ of the brownie batter in the pan.",
+          "Dollop the pumpkin mixture on top, then dollop the remaining brownie batter in between.",
+          "Drag a butter knife through the batters in a figure-eight pattern to swirl them (don't overmix).",
+          "Bake 28–32 minutes, until the pumpkin swirl is set and a toothpick in the brownie part shows moist crumbs.",
+          "Cool to room temperature, then chill 1 hour before cutting for neat squares."
+        ],
+        tip: "Wipe your knife clean between cuts for bakery-perfect squares."
+      },
+      {
+        id: "caramel-apple-blondies",
+        name: "Salted Caramel Apple Blondies",
+        category: "bars",
+        fall: true,
+        art: { type: "brownie", top: "#e2b57a", front: "#cf9d5f", side: "#b9844a", drizzle: "#a8602e" },
+        blurb: "Chewy brown sugar blondies studded with cinnamon apples and a salty caramel drizzle.",
+        time: "45 min",
+        yield: "16 squares",
+        level: "Easy",
+        ingredients: [
+          "½ cup (113 g) unsalted butter, melted",
+          "1 cup (200 g) packed brown sugar",
+          "1 large egg",
+          "1 tsp vanilla extract",
+          "1 cup (125 g) all-purpose flour",
+          "½ tsp baking powder",
+          "¼ tsp salt",
+          "1 tsp ground cinnamon",
+          "1 medium apple (Honeycrisp or Granny Smith), peeled and diced small (about 1 cup)",
+          "3 tbsp store-bought caramel sauce",
+          "Flaky sea salt, for sprinkling"
+        ],
+        steps: [
+          "Heat the oven to 350°F (175°C). Grease and line an 8x8-inch pan with parchment.",
+          "Whisk the melted butter and brown sugar until smooth, then whisk in the egg and vanilla.",
+          "Stir in the flour, baking powder, salt and cinnamon until just combined.",
+          "Fold in the diced apple and spread the batter in the pan.",
+          "Bake 25–30 minutes until golden and a toothpick comes out with a few moist crumbs.",
+          "Cool for 20 minutes, then drizzle with caramel sauce and sprinkle with flaky salt.",
+          "Let set and cool fully before slicing."
+        ],
+        tip: "Dice the apple small (about ¼ inch) so it softens fully while baking."
+      },
+      {
+        id: "sour-cream-coffee-cake",
+        name: "Cinnamon Streusel Coffee Cake",
+        category: "cakes",
+        fall: true,
+        art: { type: "cake", body: "#f0d3a2", top: "#b9783f", crumbs: "#8f5730" },
+        blurb: "A tender sour cream cake with a thick ribbon and topping of cinnamon streusel.",
+        time: "1 hr",
+        yield: "9 squares",
+        level: "Easy",
+        ingredients: [
+          "Streusel: ¾ cup (150 g) packed brown sugar",
+          "¾ cup (95 g) all-purpose flour",
+          "1 tbsp ground cinnamon",
+          "6 tbsp (85 g) unsalted butter, melted",
+          "Cake: ½ cup (113 g) unsalted butter, softened",
+          "¾ cup (150 g) granulated sugar",
+          "2 large eggs",
+          "1 tsp vanilla extract",
+          "1 cup (240 g) sour cream",
+          "1 ¾ cups (220 g) all-purpose flour",
+          "1 tsp baking powder",
+          "½ tsp baking soda",
+          "¼ tsp salt"
+        ],
+        steps: [
+          "Heat the oven to 350°F (175°C). Grease a 9x9-inch pan.",
+          "Make the streusel: mix the brown sugar, flour and cinnamon, then stir in the melted butter until clumpy. Set aside.",
+          "Beat the butter and sugar until fluffy, then beat in the eggs one at a time and the vanilla.",
+          "Mix in the sour cream.",
+          "Whisk the flour, baking powder, baking soda and salt, then add to the batter and mix just until combined (it will be thick).",
+          "Spread half the batter in the pan and sprinkle with half the streusel.",
+          "Dollop and gently spread the remaining batter, then top with the rest of the streusel.",
+          "Bake 40–45 minutes until a toothpick in the center comes out clean.",
+          "Cool at least 20 minutes before cutting."
+        ],
+        tip: "Squeeze the streusel in your hand before sprinkling to make bigger, crunchier clumps."
+      },
+      {
+        id: "pumpkin-spice-mug-cake",
+        name: "Pumpkin Spice Mug Cake",
+        category: "cakes",
+        fall: true,
+        art: { type: "mug", mug: "#c9764a", cake: "#e0a060", cream: "#fbf2e6" },
+        blurb: "A single-serving pumpkin cake made in a mug — ready in about five minutes.",
+        time: "5 min",
+        yield: "1 serving",
+        level: "Very easy",
+        ingredients: [
+          "4 tbsp (32 g) all-purpose flour",
+          "2 tbsp packed brown sugar",
+          "¼ tsp baking powder",
+          "½ tsp pumpkin pie spice",
+          "Pinch of salt",
+          "3 tbsp canned pumpkin purée",
+          "2 tbsp milk",
+          "1 tbsp vegetable oil or melted butter",
+          "¼ tsp vanilla extract",
+          "Whipped cream, to serve (optional)"
+        ],
+        steps: [
+          "In a large microwave-safe mug (at least 12 oz), stir together the flour, brown sugar, baking powder, spice and salt.",
+          "Add the pumpkin, milk, oil and vanilla and stir until completely smooth, scraping the bottom of the mug.",
+          "Microwave on high for 70–90 seconds, until the top looks set and springs back when touched.",
+          "Let it rest for 1 minute (the mug will be hot!).",
+          "Top with whipped cream and a pinch of extra spice."
+        ],
+        tip: "Microwaves vary — start checking at 60 seconds. Overcooked mug cakes turn rubbery."
+      },
+      {
+        id: "lemon-drizzle-loaf",
+        name: "Lemon Drizzle Loaf",
+        category: "cakes",
+        fall: false,
+        art: { type: "loaf", body: "#f1d48f", crust: "#d4a253", glaze: "#fdf6e3" },
+        blurb: "A bright, buttery loaf soaked in a tangy lemon glaze — sunshine for gray days.",
+        time: "1 hr 10 min",
+        yield: "1 loaf (about 10 slices)",
+        level: "Easy",
+        ingredients: [
+          "½ cup (113 g) unsalted butter, softened",
+          "¾ cup (150 g) granulated sugar",
+          "Zest of 1 large lemon",
+          "2 large eggs",
+          "1 ½ cups (190 g) all-purpose flour",
+          "1 ½ tsp baking powder",
+          "¼ tsp salt",
+          "½ cup (120 ml) milk",
+          "Glaze: 1 cup (120 g) powdered sugar + 2 tbsp fresh lemon juice"
+        ],
+        steps: [
+          "Heat the oven to 350°F (175°C). Grease and line a 9x5-inch loaf pan with parchment.",
+          "Rub the lemon zest into the sugar with your fingertips until fragrant.",
+          "Beat the butter with the lemon sugar until fluffy, then beat in the eggs one at a time.",
+          "Whisk the flour, baking powder and salt. Add to the batter in two parts, alternating with the milk, mixing gently.",
+          "Pour into the pan and bake 45–50 minutes, until a toothpick comes out clean.",
+          "Cool in the pan for 10 minutes, then lift onto a rack.",
+          "Whisk the powdered sugar and lemon juice into a thick glaze and spoon it over the warm loaf."
+        ],
+        tip: "Poke a few holes in the warm loaf with a skewer before glazing so the lemon soaks in."
+      },
+      {
+        id: "chocolate-lava-cakes",
+        name: "Molten Chocolate Lava Cakes",
+        category: "cakes",
+        fall: false,
+        art: { type: "cake", body: "#5c3322", top: "#4a281a", lava: "#3a1f14", dust: "#f6ece0" },
+        blurb: "Restaurant-style chocolate cakes with a gooey, flowing center. Fancier than they are hard.",
+        time: "30 min",
+        yield: "4 cakes",
+        level: "Medium",
+        ingredients: [
+          "½ cup (113 g) unsalted butter, plus extra for the ramekins",
+          "4 oz (113 g) semisweet chocolate, chopped",
+          "1 cup (120 g) powdered sugar, plus extra for dusting",
+          "2 large eggs",
+          "2 large egg yolks",
+          "6 tbsp (47 g) all-purpose flour",
+          "Cocoa powder, for the ramekins"
+        ],
+        steps: [
+          "Heat the oven to 425°F (220°C). Butter four 6-oz ramekins and dust them with cocoa powder. Place on a baking sheet.",
+          "Microwave the butter and chocolate in 30-second bursts, stirring each time, until smooth.",
+          "Whisk in the powdered sugar until blended.",
+          "Whisk in the eggs and yolks, then stir in the flour.",
+          "Divide the batter evenly among the ramekins.",
+          "Bake 13–14 minutes, until the sides are firm but the centers still jiggle.",
+          "Let stand 1 minute, run a knife around the edges and carefully invert onto plates.",
+          "Dust with powdered sugar and serve right away."
+        ],
+        tip: "You can fill the ramekins up to a day ahead and refrigerate — just add 1–2 minutes to the bake."
+      },
+      {
+        id: "gingerbread-loaf",
+        name: "Gingerbread Loaf with Orange Glaze",
+        category: "cakes",
+        fall: true,
+        art: { type: "loaf", body: "#8a5530", crust: "#6b3f22", glaze: "#fbf0e1" },
+        blurb: "A moist, deeply spiced molasses loaf with a bright little orange glaze on top.",
+        time: "1 hr 10 min",
+        yield: "1 loaf (about 10 slices)",
+        level: "Easy",
+        ingredients: [
+          "1 ½ cups (190 g) all-purpose flour",
+          "1 tsp baking soda",
+          "1 ½ tsp ground ginger",
+          "1 tsp ground cinnamon",
+          "¼ tsp ground cloves",
+          "¼ tsp salt",
+          "½ cup (113 g) unsalted butter, melted",
+          "½ cup (100 g) packed brown sugar",
+          "½ cup (120 ml) unsulphured molasses",
+          "1 large egg",
+          "½ cup (120 ml) hot water",
+          "Glaze: ½ cup (60 g) powdered sugar + 1 tbsp orange juice + a little orange zest"
+        ],
+        steps: [
+          "Heat the oven to 350°F (175°C). Grease a 9x5-inch loaf pan and line it with parchment.",
+          "Whisk the flour, baking soda, spices and salt in a bowl.",
+          "In a large bowl, whisk the melted butter, brown sugar, molasses and egg until smooth.",
+          "Stir in the dry ingredients until just combined.",
+          "Slowly whisk in the hot water until the batter is smooth (it will be thin — that's right).",
+          "Pour into the pan and bake 45–55 minutes, until a toothpick in the center comes out clean.",
+          "Cool in the pan for 20 minutes, then lift out and cool completely on a rack.",
+          "Whisk the powdered sugar, orange juice and zest into a thick glaze and spoon it over the top."
+        ],
+        tip: "Lightly grease your measuring cup before measuring molasses so it slides right out."
+      },
+      {
+        id: "apple-crumb-muffins",
+        name: "Cinnamon Apple Crumb Muffins",
+        category: "breads",
+        fall: true,
+        art: { type: "muffin", top: "#d9a061", liner: "#c46f43", crumbs: "#f2dcb6" },
+        blurb: "Tender muffins full of juicy apple bits under a crunchy cinnamon crumb topping.",
+        time: "35 min",
+        yield: "10 muffins",
+        level: "Easy",
+        ingredients: [
+          "Muffins: 1 ½ cups (190 g) all-purpose flour",
+          "¾ cup (150 g) granulated sugar",
+          "2 tsp baking powder",
+          "½ tsp salt",
+          "1 tsp ground cinnamon",
+          "⅓ cup (80 ml) vegetable oil",
+          "1 large egg",
+          "⅓ cup (80 ml) milk",
+          "1 cup peeled, finely diced apple (about 1 medium)",
+          "Crumb: ½ cup (100 g) packed brown sugar",
+          "⅓ cup (42 g) all-purpose flour",
+          "¼ cup (57 g) cold butter, cubed",
+          "1 ½ tsp ground cinnamon"
+        ],
+        steps: [
+          "Heat the oven to 400°F (200°C). Line a muffin tin with 10 paper liners.",
+          "Make the crumb: rub the brown sugar, flour, butter and cinnamon together with your fingertips until it looks like coarse crumbs. Set aside.",
+          "In a large bowl, whisk the flour, sugar, baking powder, salt and cinnamon.",
+          "In a measuring cup, whisk the oil, egg and milk.",
+          "Pour the wet ingredients into the dry and stir just until combined — a few lumps are fine.",
+          "Fold in the diced apple.",
+          "Fill the liners almost to the top and pile on the crumb topping.",
+          "Bake 18–22 minutes until a toothpick in the center comes out clean.",
+          "Cool in the tin for 5 minutes, then move to a rack."
+        ],
+        tip: "Don't overmix! Stirring too much makes muffins tough instead of tender."
+      },
+      {
+        id: "classic-banana-bread",
+        name: "Cozy Classic Banana Bread",
+        category: "breads",
+        fall: false,
+        art: { type: "loaf", body: "#c88a4f", crust: "#8f5a2e" },
+        blurb: "The easiest, most comforting loaf — a perfect use for those spotty bananas.",
+        time: "1 hr 15 min",
+        yield: "1 loaf (about 10 slices)",
+        level: "Very easy",
+        ingredients: [
+          "3 very ripe bananas",
+          "⅓ cup (75 g) unsalted butter, melted",
+          "1 tsp baking soda",
+          "Pinch of salt",
+          "½ tsp ground cinnamon (optional)",
+          "¾ cup (150 g) granulated or brown sugar",
+          "1 large egg, beaten",
+          "1 tsp vanilla extract",
+          "1 ½ cups (190 g) all-purpose flour"
+        ],
+        steps: [
+          "Heat the oven to 350°F (175°C) and grease a 9x5-inch loaf pan.",
+          "Mash the bananas in a large bowl until mostly smooth.",
+          "Stir in the melted butter.",
+          "Mix in the baking soda, salt and cinnamon.",
+          "Stir in the sugar, beaten egg and vanilla.",
+          "Add the flour and stir just until no dry flour is visible.",
+          "Pour into the pan and bake 55–65 minutes, until a toothpick in the center comes out clean.",
+          "Cool in the pan for 10 minutes, then turn out onto a rack."
+        ],
+        tip: "The blacker the banana peel, the sweeter and more flavorful the bread."
+      },
+      {
+        id: "pumpkin-bread",
+        name: "Spiced Pumpkin Bread",
+        category: "breads",
+        fall: true,
+        art: { type: "loaf", body: "#d98a45", crust: "#a35e2c", seeds: "#e9dcc2" },
+        blurb: "Moist, warmly spiced and fills the whole house with that pumpkin-spice smell.",
+        time: "1 hr 20 min",
+        yield: "1 loaf (about 10 slices)",
+        level: "Easy",
+        ingredients: [
+          "1 ¾ cups (220 g) all-purpose flour",
+          "1 tsp baking soda",
+          "½ tsp salt",
+          "2 tsp pumpkin pie spice",
+          "½ cup (120 ml) vegetable oil",
+          "½ cup (100 g) granulated sugar",
+          "½ cup (100 g) packed brown sugar",
+          "1 ½ cups (365 g) canned pumpkin purée",
+          "2 large eggs",
+          "¼ cup (60 ml) milk",
+          "1 tsp vanilla extract",
+          "2 tbsp pepitas (pumpkin seeds) for the top (optional)"
+        ],
+        steps: [
+          "Heat the oven to 350°F (175°C). Grease and line a 9x5-inch loaf pan with parchment.",
+          "Whisk the flour, baking soda, salt and pumpkin pie spice in a bowl.",
+          "In a large bowl, whisk the oil and both sugars, then whisk in the pumpkin, eggs, milk and vanilla until smooth.",
+          "Add the dry ingredients and stir just until combined.",
+          "Pour into the pan and sprinkle with pepitas.",
+          "Bake 60–65 minutes, until a toothpick in the center comes out clean. Tent with foil after 40 minutes if the top darkens too quickly.",
+          "Cool in the pan for 15 minutes, then lift out and cool on a rack."
+        ],
+        tip: "It tastes even better the next day — wrap it tightly and let the spices settle overnight."
+      },
+      {
+        id: "apple-cider-donut-muffins",
+        name: "Apple Cider Donut Muffins",
+        category: "breads",
+        fall: true,
+        art: { type: "muffin", top: "#e3b77c", liner: "#a9643a", crumbs: "#fbf2e4", sugary: true },
+        blurb: "All the flavor of an orchard cider donut, baked as a muffin and dunked in cinnamon sugar.",
+        time: "45 min",
+        yield: "12 muffins",
+        level: "Easy",
+        ingredients: [
+          "1 cup (240 ml) apple cider",
+          "2 cups (250 g) all-purpose flour",
+          "1 ½ tsp baking powder",
+          "½ tsp baking soda",
+          "½ tsp salt",
+          "1 tsp ground cinnamon",
+          "¼ tsp ground nutmeg",
+          "½ cup (113 g) unsalted butter, melted",
+          "½ cup (100 g) packed brown sugar",
+          "¼ cup (50 g) granulated sugar",
+          "2 large eggs",
+          "⅓ cup (80 ml) buttermilk or plain yogurt thinned with milk",
+          "Coating: 3 tbsp melted butter, ½ cup (100 g) sugar, 1 tsp cinnamon"
+        ],
+        steps: [
+          "Simmer the apple cider in a small pot until reduced to ½ cup (about 10–15 minutes). Let it cool.",
+          "Heat the oven to 350°F (175°C) and grease a 12-cup muffin tin well.",
+          "Whisk the flour, baking powder, baking soda, salt, cinnamon and nutmeg in a bowl.",
+          "In a large bowl, whisk the melted butter and both sugars, then whisk in the eggs, reduced cider and buttermilk.",
+          "Stir in the dry ingredients just until combined.",
+          "Divide the batter among the muffin cups (about ⅔ full).",
+          "Bake 18–20 minutes until a toothpick comes out clean.",
+          "While still warm, brush each muffin with melted butter and roll it in the cinnamon sugar."
+        ],
+        tip: "Reducing the cider concentrates the apple flavor — don't skip it!"
+      },
+      {
+        id: "cranberry-orange-scones",
+        name: "Cranberry Orange Scones",
+        category: "breads",
+        fall: true,
+        art: { type: "scone", body: "#e8c48c", edge: "#c49558", dot: "#a8323a", glaze: "#fdf6ea" },
+        blurb: "Flaky, buttery scones with tart cranberries, fresh orange zest and a sweet glaze.",
+        time: "40 min",
+        yield: "8 scones",
+        level: "Easy",
+        ingredients: [
+          "2 cups (250 g) all-purpose flour",
+          "⅓ cup (67 g) granulated sugar",
+          "1 tbsp baking powder",
+          "½ tsp salt",
+          "Zest of 1 orange",
+          "½ cup (113 g) very cold unsalted butter, cubed",
+          "¾ cup (90 g) dried cranberries",
+          "½ cup (120 ml) cold heavy cream, plus more for brushing",
+          "1 large egg",
+          "1 tsp vanilla extract",
+          "Glaze: 1 cup (120 g) powdered sugar + 2 tbsp orange juice"
+        ],
+        steps: [
+          "Heat the oven to 400°F (200°C) and line a baking sheet with parchment.",
+          "Whisk the flour, sugar, baking powder, salt and orange zest in a large bowl.",
+          "Cut in the cold butter with a pastry cutter or your fingertips until it looks like coarse crumbs with pea-sized bits.",
+          "Stir in the cranberries.",
+          "Whisk the cream, egg and vanilla, pour into the flour mixture and stir until the dough just comes together.",
+          "Turn out onto a floured surface, pat into an 8-inch circle and cut into 8 wedges.",
+          "Place on the sheet, brush with a little cream and bake 18–20 minutes until golden.",
+          "Cool 10 minutes, then drizzle with the orange glaze."
+        ],
+        tip: "Keep everything cold — cold butter makes steam pockets in the oven, which means flaky layers."
+      },
+      {
+        id: "rustic-apple-galette",
+        name: "Rustic Apple Galette",
+        category: "pies",
+        fall: true,
+        art: { type: "galette", crust: "#ddae6d", edge: "#b98244", filling: "#efcf86", slice: "#d8a957" },
+        blurb: "All the joy of apple pie without the fuss — a free-form tart that's meant to look homemade.",
+        time: "1 hr 30 min",
+        yield: "6 slices",
+        level: "Medium",
+        ingredients: [
+          "Crust: 1 ¼ cups (160 g) all-purpose flour",
+          "1 tbsp granulated sugar",
+          "½ tsp salt",
+          "½ cup (113 g) very cold unsalted butter, cubed",
+          "3–5 tbsp ice water",
+          "Filling: 3 medium apples, peeled, cored and thinly sliced",
+          "¼ cup (50 g) granulated sugar",
+          "1 tsp ground cinnamon",
+          "1 tbsp all-purpose flour",
+          "1 tsp lemon juice",
+          "1 egg, beaten, plus coarse sugar for sprinkling"
+        ],
+        steps: [
+          "Make the crust: mix the flour, sugar and salt. Cut in the butter until pea-sized pieces remain.",
+          "Drizzle in ice water a tablespoon at a time, tossing with a fork, until the dough holds together when squeezed.",
+          "Shape into a disc, wrap and chill at least 30 minutes.",
+          "Heat the oven to 400°F (200°C). Toss the apple slices with the sugar, cinnamon, flour and lemon juice.",
+          "Roll the dough into a 12-inch circle on parchment and slide it onto a baking sheet.",
+          "Arrange the apples in the center, leaving a 2-inch border.",
+          "Fold the border up over the edge of the apples, pleating it as you go.",
+          "Brush the crust with beaten egg and sprinkle with coarse sugar.",
+          "Bake 35–40 minutes until the crust is deep golden and the apples are tender.",
+          "Cool 15 minutes before slicing."
+        ],
+        tip: "Store-bought pie dough works beautifully here if you want a shortcut."
+      },
+      {
+        id: "mini-pecan-pie-bites",
+        name: "Mini Pecan Pie Bites",
+        category: "pies",
+        fall: true,
+        art: { type: "pie", crust: "#d9a15f", edge: "#b97b3f", filling: "#7d4524", nuts: "#a8643a" },
+        blurb: "Bite-sized pecan pies in a mini muffin tin — cute, gooey and great for sharing.",
+        time: "40 min",
+        yield: "24 bites",
+        level: "Easy",
+        ingredients: [
+          "1 box (2 sheets) refrigerated pie crust",
+          "1 large egg",
+          "⅓ cup (67 g) packed brown sugar",
+          "⅓ cup (80 ml) light corn syrup or pure maple syrup",
+          "1 tbsp unsalted butter, melted",
+          "½ tsp vanilla extract",
+          "Pinch of salt",
+          "¾ cup (85 g) pecans, finely chopped"
+        ],
+        steps: [
+          "Heat the oven to 350°F (175°C). Lightly grease a 24-cup mini muffin tin.",
+          "Unroll the pie crusts and cut out 24 rounds with a 2 ½-inch cookie cutter (re-roll scraps as needed).",
+          "Press each round into a muffin cup.",
+          "Whisk the egg, brown sugar, syrup, melted butter, vanilla and salt until smooth, then stir in the pecans.",
+          "Spoon the filling into each cup, about ¾ full.",
+          "Bake 18–22 minutes until the crust is golden and the filling is set.",
+          "Cool 10 minutes, then run a knife around each bite to remove."
+        ],
+        tip: "Don't overfill — the filling puffs up in the oven and can bubble over."
+      },
+      {
+        id: "pear-cardamom-crumble",
+        name: "Pear & Cardamom Crumble",
+        category: "pies",
+        fall: true,
+        art: { type: "crumble", dish: "#c9764a", topping: "#dfb27a", fruit: "#e9d9a0" },
+        blurb: "Soft, fragrant pears under a buttery oat crumble. Best eaten warm with vanilla ice cream.",
+        time: "55 min",
+        yield: "6 servings",
+        level: "Very easy",
+        ingredients: [
+          "4 ripe pears, peeled, cored and cut into chunks",
+          "1 tbsp lemon juice",
+          "2 tbsp granulated sugar",
+          "1 tbsp all-purpose flour",
+          "½ tsp ground cardamom",
+          "Topping: ¾ cup (95 g) all-purpose flour",
+          "½ cup (45 g) old-fashioned rolled oats",
+          "½ cup (100 g) packed brown sugar",
+          "½ tsp ground cinnamon",
+          "Pinch of salt",
+          "6 tbsp (85 g) cold unsalted butter, cubed"
+        ],
+        steps: [
+          "Heat the oven to 375°F (190°C) and butter an 8x8-inch baking dish.",
+          "Toss the pears with the lemon juice, sugar, flour and cardamom, and spread them in the dish.",
+          "In a bowl, mix the flour, oats, brown sugar, cinnamon and salt.",
+          "Rub in the cold butter with your fingertips until the mixture forms clumps.",
+          "Scatter the topping evenly over the pears.",
+          "Bake 35–40 minutes until the top is golden and the fruit is bubbling at the edges.",
+          "Let cool 10 minutes, then serve warm."
+        ],
+        tip: "No cardamom? Use cinnamon plus a pinch of ginger instead."
+      },
+      {
+        id: "puff-pastry-cinnamon-rolls",
+        name: "Puff Pastry Cinnamon Rolls",
+        category: "pies",
+        fall: true,
+        art: { type: "swirl", pastry: "#e7bb7c", swirl: "#a8683a" },
+        blurb: "Flaky, buttery cinnamon rolls with no yeast and no waiting — just store-bought puff pastry.",
+        time: "35 min",
+        yield: "10 rolls",
+        level: "Easy",
+        ingredients: [
+          "1 sheet frozen puff pastry, thawed in the fridge",
+          "2 tbsp unsalted butter, melted",
+          "⅓ cup (67 g) packed brown sugar",
+          "1 ½ tsp ground cinnamon",
+          "Glaze: ½ cup (60 g) powdered sugar",
+          "1 tbsp milk",
+          "¼ tsp vanilla extract"
+        ],
+        steps: [
+          "Heat the oven to 400°F (200°C) and grease 10 cups of a muffin tin.",
+          "Unfold the puff pastry on a lightly floured surface and gently roll it into a rectangle about 10x12 inches.",
+          "Brush with melted butter, leaving a ½-inch strip bare along one long edge.",
+          "Mix the brown sugar and cinnamon and sprinkle it evenly over the butter.",
+          "Starting from the long edge with filling, roll the pastry up tightly into a log and pinch the seam closed.",
+          "Slice into 10 rolls (about 1 inch thick) and place each one cut side up in a muffin cup.",
+          "Bake 18–22 minutes until puffed and deep golden.",
+          "Cool 5 minutes, then whisk the powdered sugar, milk and vanilla and drizzle over the warm rolls."
+        ],
+        tip: "Chill the rolled log for 10 minutes before slicing — it cuts much more cleanly."
+      }
+    ];
+
+    /* Real photos for each recipe, matched by recipe id.
+       Free-to-use photos from Pexels (pexels.com/license), each chosen because
+       its description names the same kind of bake.
+       If a photo can't load, the matching drawing from section 2 is shown instead. */
+    function pexelsPhoto(photoId) {
+      return "https://images.pexels.com/photos/" + photoId + "/pexels-photo-" + photoId +
+        ".jpeg?auto=compress&cs=tinysrgb&w=1000&h=750&fit=crop";
+    }
+
+    const RECIPE_PHOTOS = {
+      "pumpkin-spice-snickerdoodles": pexelsPhoto(31116125),        // sugar cookies with a cracked top
+      "brown-butter-chocolate-chip-cookies": pexelsPhoto(298485),   // two chocolate chip cookies
+      "maple-oatmeal-cookies": pexelsPhoto(10170491),               // oatmeal cookies and milk, autumn table
+      "molasses-ginger-crinkles": pexelsPhoto(30468106),            // ginger cookies sprinkled with sugar
+      "pumpkin-chocolate-chip-cookies": pexelsPhoto(8081573),       // stack of chocolate chip cookies
+      "brown-sugar-shortbread": pexelsPhoto(14757516),              // stacked shortbread on wood
+      "classic-fudgy-brownies": pexelsPhoto(15033468),              // stacked chocolate brownies
+      "pumpkin-cheesecake-brownies": pexelsPhoto(8736401),          // rustic brownies with dried flowers
+      "caramel-apple-blondies": pexelsPhoto(36500586),              // blondie pieces on a plate
+      "sour-cream-coffee-cake": pexelsPhoto(34241965),              // slice of streusel crumb cake
+      "pumpkin-spice-mug-cake": pexelsPhoto(2764272),               // warm mug cake on a saucer
+      "lemon-drizzle-loaf": pexelsPhoto(34996431),                  // lemon cake slices
+      "chocolate-lava-cakes": pexelsPhoto(20377567),                // molten chocolate cake
+      "gingerbread-loaf": pexelsPhoto(14939288),                    // rustic gingerbread cake
+      "apple-crumb-muffins": pexelsPhoto(38939106),                 // muffins with crumbly topping
+      "classic-banana-bread": pexelsPhoto(4114142),                 // banana bread with slices
+      "pumpkin-bread": pexelsPhoto(9536038),                        // pumpkin bread slices, fall setting
+      "apple-cider-donut-muffins": pexelsPhoto(11176257),           // golden brown muffins
+      "cranberry-orange-scones": pexelsPhoto(30512698),             // scones with dried fruit
+      "rustic-apple-galette": pexelsPhoto(36694937),                // rustic apple galette
+      "mini-pecan-pie-bites": pexelsPhoto(5840168),                 // pecan pie on a rustic table
+      "pear-cardamom-crumble": pexelsPhoto(37363601),               // fruit crumble dessert
+      "puff-pastry-cinnamon-rolls": pexelsPhoto(14576632)           // cinnamon rolls with icing
+    };
+
+    /* Friendly labels for each category */
+    const CATEGORY_LABELS = {
+      cookies: "Cookies",
+      bars: "Brownies & Bars",
+      cakes: "Cakes",
+      breads: "Breads, Muffins & Scones",
+      pies: "Pies & Pastries"
+    };
+
+    /* Warm, friendly intro lines that rotate with each new treat */
+    const INTRO_LINES = [
+      "Your cozy little bake is…",
+      "Your warm & wonderful treat is…",
+      "Your snuggly sweet pick is…",
+      "Your golden-hour bake is…",
+      "Your heart-warming treat is…",
+      "Your sweet & toasty pick is…",
+      "Your comforting little treat is…"
+    ];
+
+    /* Allowed characters for the ingredient field: letters, spaces, hyphens, apostrophes */
+    const INGREDIENT_PATTERN = /^[a-zA-Z][a-zA-Z\s'-]{1,29}$/;
+
+    /* Elements that should NOT trigger a new treat when clicked */
+    const INTERACTIVE_SELECTOR = "button, a, input, select, textarea, label, summary, details, dialog, form";
+
+    /* ---------------------------------------------------------
+       2. BACKUP ILLUSTRATIONS
+       Small inline SVG drawings, shown only if a real photo can't
+       load (for example, when the page is opened offline).
+       Each function takes the recipe's "art" colors and returns
+       an SVG string. All share a 200x160 canvas.
+       --------------------------------------------------------- */
+
+    /* Soft shadow under every bake */
+    function shadow(width) {
+      return `<ellipse cx="100" cy="142" rx="${width}" ry="9" fill="#5a3a26" opacity="0.10"/>`;
+    }
+
+    function drawCookie(art) {
+      // Fixed positions keep the chips/sugar spots looking natural
+      const spots = [[78, 62], [120, 66], [96, 92], [128, 102], [68, 96], [106, 118], [84, 120], [140, 80], [60, 76]];
+      let dots = "";
+      spots.forEach(function (spot) {
+        dots += `<circle cx="${spot[0]}" cy="${spot[1]}" r="${art.dotSize}" fill="${art.dot}"/>`;
+      });
+
+      // Optional glaze zigzag (for maple cookies)
+      const glaze = art.glaze
+        ? `<path d="M58 70 L82 96 L96 64 L112 100 L128 70 L142 98" fill="none" stroke="${art.glaze}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`
+        : "";
+
+      return `
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          ${shadow(66)}
+          <circle cx="100" cy="88" r="60" fill="${art.base}"/>
+          <circle cx="100" cy="88" r="57" fill="none" stroke="${art.edge}" stroke-width="5" opacity="0.35"/>
+          <path d="M70 108 Q86 100 98 110 M110 72 Q122 66 134 74" fill="none" stroke="${art.edge}" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+          ${dots}
+          ${glaze}
+        </svg>`;
+    }
+
+    function drawBrownie(art) {
+      const swirl = art.swirl
+        ? `<path d="M58 60 Q74 52 88 60 T118 60 T146 58" fill="none" stroke="${art.swirl}" stroke-width="6" stroke-linecap="round" opacity="0.9"/>`
+        : "";
+      const drizzle = art.drizzle
+        ? `<path d="M52 66 Q70 50 84 64 Q100 50 116 62 Q132 50 150 60" fill="none" stroke="${art.drizzle}" stroke-width="3.5" stroke-linecap="round"/>
+           <circle cx="72" cy="60" r="1.6" fill="#fff"/><circle cx="108" cy="58" r="1.6" fill="#fff"/><circle cx="136" cy="60" r="1.6" fill="#fff"/>`
+        : "";
+
+      return `
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          ${shadow(70)}
+          <polygon points="40,74 140,74 140,128 40,128" fill="${art.front}"/>
+          <polygon points="140,74 162,56 162,110 140,128" fill="${art.side}"/>
+          <polygon points="40,74 62,46 162,46 140,74" fill="${art.top}"/>
+          <path d="M48 90 L132 90 M48 106 L132 106" stroke="#000" opacity="0.07" stroke-width="2"/>
+          ${swirl}
+          ${drizzle}
+        </svg>`;
+    }
+
+    function drawCake(art) {
+      // A round little cake. Lava cakes get a molten pool, others get a crumb/frosting top.
+      const lava = art.lava
+        ? `<path d="M100 112 Q116 128 150 132 Q120 140 92 136 Q70 132 64 126 Q86 124 100 112 Z" fill="${art.lava}"/>`
+        : "";
+      const dusting = art.dust
+        ? `<ellipse cx="100" cy="64" rx="44" ry="11" fill="${art.dust}" opacity="0.85"/>`
+        : "";
+      let crumbs = "";
+      if (art.crumbs) {
+        [[74, 62], [90, 58], [108, 60], [124, 64], [98, 68], [82, 68], [116, 70]].forEach(function (c) {
+          crumbs += `<circle cx="${c[0]}" cy="${c[1]}" r="4" fill="${art.crumbs}"/>`;
+        });
+      }
+
+      return `
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          ${shadow(68)}
+          <ellipse cx="100" cy="132" rx="72" ry="10" fill="#f6ede1"/>
+          <path d="M50 66 L50 118 Q100 136 150 118 L150 66 Z" fill="${art.body}"/>
+          <ellipse cx="100" cy="66" rx="50" ry="14" fill="${art.top}"/>
+          <path d="M60 72 Q62 86 66 76 Q70 90 76 78" fill="${art.top}" opacity="${art.dust ? 0 : 1}"/>
+          ${dusting}
+          ${crumbs}
+          ${lava}
+        </svg>`;
+    }
+
+    function drawMuffin(art) {
+      let toppings = "";
+      [[78, 60], [96, 52], [114, 58], [128, 70], [86, 74], [108, 72], [70, 78]].forEach(function (c) {
+        const radius = art.sugary ? 2 : 4;
+        toppings += `<circle cx="${c[0]}" cy="${c[1]}" r="${radius}" fill="${art.crumbs}"/>`;
+      });
+
+      return `
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          ${shadow(48)}
+          <polygon points="62,90 138,90 128,138 72,138" fill="${art.liner}"/>
+          <path d="M76 92 L80 136 M92 92 L94 136 M108 92 L106 136 M124 92 L120 136" stroke="#fff" stroke-width="2" opacity="0.25"/>
+          <path d="M52 94 Q46 40 100 38 Q154 40 148 94 Z" fill="${art.top}"/>
+          ${toppings}
+        </svg>`;
+    }
+
+    function drawLoaf(art) {
+      const glaze = art.glaze
+        ? `<path d="M44 70 Q100 48 156 70 L156 78 Q148 90 142 78 Q132 92 124 78 Q112 94 102 80 Q90 94 80 80 Q68 92 60 80 Q50 90 44 78 Z" fill="${art.glaze}"/>`
+        : "";
+      let seeds = "";
+      if (art.seeds) {
+        [[78, 62], [94, 58], [110, 58], [126, 62], [102, 66]].forEach(function (s) {
+          seeds += `<ellipse cx="${s[0]}" cy="${s[1]}" rx="4" ry="2.2" fill="${art.seeds}" transform="rotate(-20 ${s[0]} ${s[1]})"/>`;
+        });
+      }
+
+      return `
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          ${shadow(66)}
+          <rect x="42" y="68" width="116" height="66" rx="12" fill="${art.body}"/>
+          <path d="M40 76 Q100 36 160 76 Z" fill="${art.crust}"/>
+          <path d="M70 64 Q100 52 130 64" fill="none" stroke="#000" opacity="0.12" stroke-width="3" stroke-linecap="round"/>
+          ${glaze}
+          ${seeds}
+        </svg>`;
+    }
+
+    function drawPie(art) {
+      // A round mini pie seen from slightly above, with pecans on top
+      let nuts = "";
+      [[84, 82], [100, 76], [116, 82], [92, 94], [110, 94]].forEach(function (n) {
+        nuts += `<ellipse cx="${n[0]}" cy="${n[1]}" rx="7" ry="4.5" fill="${art.nuts}"/>
+                 <path d="M${n[0] - 5} ${n[1]} L${n[0] + 5} ${n[1]}" stroke="#5a2f18" stroke-width="1" opacity="0.6"/>`;
+      });
+
+      return `
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          ${shadow(64)}
+          <path d="M44 90 L56 128 Q100 142 144 128 L156 90 Z" fill="${art.edge}"/>
+          <ellipse cx="100" cy="88" rx="58" ry="26" fill="${art.crust}"/>
+          <ellipse cx="100" cy="88" rx="46" ry="19" fill="${art.filling}"/>
+          ${nuts}
+        </svg>`;
+    }
+
+    function drawGalette(art) {
+      return `
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          ${shadow(70)}
+          <path d="M36 92 Q34 60 64 50 Q100 34 138 50 Q168 62 164 94 Q160 126 126 132 Q100 138 72 132 Q38 124 36 92 Z" fill="${art.crust}"/>
+          <ellipse cx="100" cy="90" rx="44" ry="26" fill="${art.filling}"/>
+          <path d="M70 86 Q86 74 104 80 M80 98 Q98 88 120 94 M96 72 Q114 68 128 80" fill="none" stroke="${art.slice}" stroke-width="5" stroke-linecap="round"/>
+          <path d="M56 70 Q66 66 70 76 M132 64 Q142 70 136 78 M140 108 Q132 118 124 110 M66 114 Q74 106 80 116" fill="none" stroke="${art.edge}" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="62" cy="96" r="1.6" fill="#fff"/><circle cx="144" cy="90" r="1.6" fill="#fff"/><circle cx="100" cy="122" r="1.6" fill="#fff"/>
+        </svg>`;
+    }
+
+    function drawScone(art) {
+      let berries = "";
+      [[84, 92], [104, 80], [114, 104], [94, 112], [126, 92]].forEach(function (b) {
+        berries += `<circle cx="${b[0]}" cy="${b[1]}" r="4" fill="${art.dot}"/>`;
+      });
+
+      return `
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          ${shadow(64)}
+          <path d="M50 126 Q46 132 56 132 L150 128 Q160 126 154 116 L108 44 Q100 34 94 46 Z" fill="${art.edge}"/>
+          <path d="M54 120 L148 116 L104 46 Z" fill="${art.body}"/>
+          ${berries}
+          <path d="M80 80 L118 74 M72 98 L132 92 M66 112 L140 106" fill="none" stroke="${art.glaze}" stroke-width="3.5" stroke-linecap="round"/>
+        </svg>`;
+    }
+
+    function drawMug(art) {
+      return `
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          ${shadow(52)}
+          <path d="M136 72 Q166 72 164 98 Q162 120 134 118" fill="none" stroke="${art.mug}" stroke-width="10" stroke-linecap="round"/>
+          <path d="M58 56 L142 56 L136 132 Q100 142 64 132 Z" fill="${art.mug}"/>
+          <ellipse cx="100" cy="56" rx="42" ry="10" fill="${art.cake}"/>
+          <path d="M74 52 Q78 32 96 38 Q102 24 116 34 Q130 34 126 52 Q100 60 74 52 Z" fill="${art.cream}"/>
+          <circle cx="104" cy="40" r="1.8" fill="#c98a4e"/><circle cx="92" cy="46" r="1.5" fill="#c98a4e"/>
+          <path d="M70 80 Q100 88 130 80" fill="none" stroke="#fff" stroke-width="2" opacity="0.25"/>
+        </svg>`;
+    }
+
+    function drawCrumble(art) {
+      let clumps = "";
+      [[66, 74], [82, 66], [100, 64], [118, 66], [134, 74], [74, 86], [94, 80], [112, 82], [128, 88], [86, 94], [108, 96]].forEach(function (c) {
+        clumps += `<circle cx="${c[0]}" cy="${c[1]}" r="8" fill="${art.topping}"/>`;
+      });
+
+      return `
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          ${shadow(74)}
+          <path d="M34 82 L46 126 Q100 142 154 126 L166 82 Z" fill="${art.dish}"/>
+          <ellipse cx="100" cy="82" rx="66" ry="26" fill="${art.dish}"/>
+          <ellipse cx="100" cy="80" rx="56" ry="20" fill="${art.fruit}"/>
+          ${clumps}
+          <path d="M28 82 Q20 82 22 90 M172 82 Q180 82 178 90" fill="none" stroke="${art.dish}" stroke-width="6" stroke-linecap="round"/>
+        </svg>`;
+    }
+
+    function drawSwirl(art) {
+      // Two pastry spirals side by side
+      return `
+        <svg viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+          ${shadow(64)}
+          <circle cx="76" cy="84" r="38" fill="${art.pastry}"/>
+          <circle cx="124" cy="84" r="38" fill="${art.pastry}"/>
+          <path d="M100 118 Q100 70 76 66 Q54 66 56 86 Q58 102 76 100 Q88 98 86 86 Q84 78 76 80" fill="none" stroke="${art.swirl}" stroke-width="4" stroke-linecap="round"/>
+          <path d="M100 118 Q100 70 124 66 Q146 66 144 86 Q142 102 124 100 Q112 98 114 86 Q116 78 124 80" fill="none" stroke="${art.swirl}" stroke-width="4" stroke-linecap="round"/>
+        </svg>`;
+    }
+
+    /* Map each art type to its drawing function */
+    const ART_DRAWERS = {
+      cookie: drawCookie,
+      brownie: drawBrownie,
+      cake: drawCake,
+      muffin: drawMuffin,
+      loaf: drawLoaf,
+      pie: drawPie,
+      galette: drawGalette,
+      scone: drawScone,
+      mug: drawMug,
+      crumble: drawCrumble,
+      swirl: drawSwirl
+    };
+
+    function drawTreat(art) {
+      const drawer = ART_DRAWERS[art.type] || drawCookie;
+      return drawer(art);
+    }
+
+    /* ---------------------------------------------------------
+       3. DOM REFERENCES
+       --------------------------------------------------------- */
+    const preferencesPanel = document.getElementById("preferences-panel");
+    const preferencesForm = document.getElementById("preferences-form");
+    const typeSelect = document.getElementById("type-select");
+    const ingredientInput = document.getElementById("ingredient-input");
+    const fallCheckbox = document.getElementById("fall-checkbox");
+    const preferencesError = document.getElementById("preferences-error");
+    const clearPreferencesButton = document.getElementById("clear-preferences-button");
+
+    const treatContent = document.getElementById("treat-content");
+    const treatIntro = document.getElementById("treat-intro");
+    const treatPhotoFrame = document.getElementById("treat-photo-frame");
+    const treatCategory = document.getElementById("treat-category");
+    const treatName = document.getElementById("treat-name");
+    const treatBlurb = document.getElementById("treat-blurb");
+    const treatMeta = document.getElementById("treat-meta");
+    const recipeYesButton = document.getElementById("recipe-yes-button");
+    const recipeNoButton = document.getElementById("recipe-no-button");
+
+    const recipeDialog = document.getElementById("recipe-dialog");
+    const recipePhotoFrame = document.getElementById("recipe-photo-frame");
+    const recipeTitle = document.getElementById("recipe-title");
+    const recipeBlurb = document.getElementById("recipe-blurb");
+    const recipeMeta = document.getElementById("recipe-meta");
+    const recipeIngredients = document.getElementById("recipe-ingredients");
+    const recipeSteps = document.getElementById("recipe-steps");
+    const recipeTip = document.getElementById("recipe-tip");
+    const recipeCloseButton = document.getElementById("recipe-close-button");
+    const recipeAnotherButton = document.getElementById("recipe-another-button");
+    const recipeDoneButton = document.getElementById("recipe-done-button");
+    const recipeRemoveButton = document.getElementById("recipe-remove-button");
+
+    const openAddRecipeButton = document.getElementById("open-add-recipe-button");
+    const addSuccessMessage = document.getElementById("add-success-message");
+    const addRecipeDialog = document.getElementById("add-recipe-dialog");
+    const addStepForm = document.getElementById("add-step-form");
+    const addStepPreview = document.getElementById("add-step-preview");
+    const addRecipeForm = document.getElementById("add-recipe-form");
+    const addFormError = document.getElementById("add-form-error");
+    const addCloseButton = document.getElementById("add-close-button");
+    const addCancelButton = document.getElementById("add-cancel-button");
+    const addBackButton = document.getElementById("add-back-button");
+    const addSaveButton = document.getElementById("add-save-button");
+    const addSaveError = document.getElementById("add-save-error");
+    const previewHeading = document.getElementById("preview-heading");
+    const polishDoneList = document.getElementById("polish-done-list");
+    const polishCheckBox = document.getElementById("polish-check-box");
+    const polishCheckList = document.getElementById("polish-check-list");
+    const previewTitle = document.getElementById("preview-title");
+    const previewBlurb = document.getElementById("preview-blurb");
+    const previewMeta = document.getElementById("preview-meta");
+    const previewIngredients = document.getElementById("preview-ingredients");
+    const previewSteps = document.getElementById("preview-steps");
+    const previewTip = document.getElementById("preview-tip");
+
+    /* The add-recipe form fields, keyed by the name used in the code */
+    const ADD_FIELDS = {
+      name: document.getElementById("add-name"),
+      type: document.getElementById("add-type"),
+      fall: document.getElementById("add-fall"),
+      blurb: document.getElementById("add-blurb"),
+      time: document.getElementById("add-time"),
+      yield: document.getElementById("add-yield"),
+      ingredients: document.getElementById("add-ingredients"),
+      steps: document.getElementById("add-steps"),
+      tip: document.getElementById("add-tip"),
+      photo: document.getElementById("add-photo")
+    };
+
+    /* ---------------------------------------------------------
+       4. APP STATE
+       --------------------------------------------------------- */
+    /* Drawing used for each type when a visitor's recipe has no photo */
+    const DEFAULT_ART = {
+      cookies: { type: "cookie", base: "#d9a066", edge: "#a8683a", dot: "#6b3f22", dotSize: 5 },
+      bars: { type: "brownie", top: "#6b3f2a", front: "#55301f", side: "#43261a" },
+      cakes: { type: "cake", body: "#f0d3a2", top: "#b9783f", crumbs: "#8f5730" },
+      breads: { type: "loaf", body: "#c88a4f", crust: "#8f5a2e" },
+      pies: { type: "pie", crust: "#d9a15f", edge: "#b97b3f", filling: "#c46f43", nuts: "#a8643a" }
+    };
+
+    const STORAGE_KEY = "bakingCorner.myRecipes.v1";
+    const MAX_CUSTOM_RECIPES = 50;
+
+    let currentRecipe = null;
+    let introIndex = 0;
+    let pendingRecipe = null;          // the polished recipe waiting in the preview
+    let successMessageTimer = null;
+
+    // Recipes this visitor added before (saved in their own browser)
+    let customRecipes = loadCustomRecipes();
+
+    /* Every recipe the visitor can get: the built-in ones plus their own */
+    function getAllRecipes() {
+      return RECIPES.concat(customRecipes);
+    }
+
+    /* ---------------------------------------------------------
+       5. PREFERENCES: reading, validating and filtering
+       --------------------------------------------------------- */
+
+    /* Reads the form and returns either { valid: true, ... } or { valid: false, message } */
+    function readPreferences() {
+      const ingredient = ingredientInput.value.trim();
+
+      if (ingredient !== "" && !INGREDIENT_PATTERN.test(ingredient)) {
+        return {
+          valid: false,
+          message: "Please type a single ingredient using letters only (2–30 characters), like “apple” or “chocolate”."
+        };
+      }
+
+      return {
+        valid: true,
+        type: typeSelect.value,
+        ingredient: ingredient.toLowerCase(),
+        fallOnly: fallCheckbox.checked
+      };
+    }
+
+    /* Checks if a recipe mentions the ingredient (also tries the singular form, e.g. "apples" → "apple") */
+    function recipeHasIngredient(recipe, ingredient) {
+      if (ingredient === "") {
+        return true;
+      }
+      const searchText = (recipe.name + " " + recipe.ingredients.join(" ")).toLowerCase();
+      const singular = ingredient.endsWith("s") ? ingredient.slice(0, -1) : ingredient;
+      return searchText.includes(ingredient) || searchText.includes(singular);
+    }
+
+    /* Checks the "Type of treat" filter. "mine" means recipes the visitor added. */
+    function recipeMatchesType(recipe, type) {
+      if (type === "any") {
+        return true;
+      }
+      if (type === "mine") {
+        return recipe.custom === true;
+      }
+      return recipe.category === type;
+    }
+
+    /* Returns every recipe that matches the user's preferences */
+    function getMatchingRecipes(preferences) {
+      return getAllRecipes().filter(function (recipe) {
+        const seasonMatches = !preferences.fallOnly || recipe.fall;
+        return recipeMatchesType(recipe, preferences.type) &&
+          seasonMatches &&
+          recipeHasIngredient(recipe, preferences.ingredient);
+      });
+    }
+
+    /* Builds a friendly message explaining why nothing matched */
+    function buildNoMatchMessage(preferences) {
+      if (preferences.type === "mine" && customRecipes.length === 0) {
+        return "You haven't added any recipes yet. Tap “Add your own recipe” below the card to add your first one.";
+      }
+
+      const parts = [];
+      if (preferences.type === "mine") {
+        parts.push("in your own recipes");
+      } else if (preferences.type !== "any") {
+        parts.push(CATEGORY_LABELS[preferences.type].toLowerCase());
+      }
+      if (preferences.ingredient !== "") {
+        parts.push("with “" + preferences.ingredient + "”");
+      }
+      if (preferences.fallOnly) {
+        parts.push("from the fall favorites");
+      }
+      const description = parts.length > 0 ? parts.join(" ") : "for those choices";
+      return "Oh no, we don't have any treats " + description + " yet. Try another ingredient or type, or tap “Clear”.";
+    }
+
+    function showPreferencesError(message) {
+      preferencesError.textContent = message;
+      preferencesError.hidden = false;
+      // Mark the ingredient field invalid only when it's the source of the problem
+      ingredientInput.setAttribute("aria-invalid", ingredientInput.value.trim() !== "" ? "true" : "false");
+      // Make sure the user can actually see the error
+      preferencesPanel.open = true;
+    }
+
+    function clearPreferencesError() {
+      preferencesError.textContent = "";
+      preferencesError.hidden = true;
+      ingredientInput.setAttribute("aria-invalid", "false");
+    }
+
+    /* ---------------------------------------------------------
+       6. PICKING & SHOWING A TREAT
+       --------------------------------------------------------- */
+
+    /* Picks a random recipe, avoiding the one already on screen when possible */
+    function pickRandomRecipe(pool) {
+      const options = pool.length > 1 && currentRecipe
+        ? pool.filter(function (recipe) { return recipe.id !== currentRecipe.id; })
+        : pool;
+      return options[Math.floor(Math.random() * options.length)];
+    }
+
+    /* Fills a <ul> with small "pill" meta details, skipping any that are blank */
+    function renderMeta(listElement, recipe) {
+      listElement.innerHTML = "";
+      const details = [
+        recipe.time ? "⏱ " + recipe.time : "",
+        recipe.yield ? "🍽 " + recipe.yield : "",
+        recipe.level ? "✿ " + recipe.level : ""
+      ];
+      details.forEach(function (text) {
+        if (text === "") {
+          return;
+        }
+        const item = document.createElement("li");
+        item.textContent = text;
+        listElement.appendChild(item);
+      });
+    }
+
+    /* Fills a list element with one <li> per line of text */
+    function renderList(listElement, lines) {
+      listElement.innerHTML = "";
+      lines.forEach(function (line) {
+        const item = document.createElement("li");
+        item.textContent = line;
+        listElement.appendChild(item);
+      });
+    }
+
+    /* A built-in recipe uses its Pexels photo; a visitor's recipe uses the link they gave */
+    function getPhotoUrl(recipe) {
+      return RECIPE_PHOTOS[recipe.id] || recipe.photo || "";
+    }
+
+    /* Shows the drawn illustration inside a frame (no photo, or the photo failed) */
+    function showFallbackArt(frame, recipe) {
+      frame.classList.remove("is-loading");
+      frame.classList.add("is-fallback");
+      frame.innerHTML = drawTreat(recipe.art);
+      frame.setAttribute("role", "img");
+      frame.setAttribute("aria-label", "Illustration of " + recipe.name);
+    }
+
+    /* Loads a recipe's photo into a frame, with a shimmer while loading
+       and the drawing as a backup if the photo can't be reached. */
+    function renderPhoto(frame, recipe) {
+      frame.innerHTML = "";
+      frame.classList.remove("is-fallback");
+      frame.removeAttribute("role");
+      frame.removeAttribute("aria-label");
+
+      const photoUrl = getPhotoUrl(recipe);
+      if (!photoUrl) {
+        showFallbackArt(frame, recipe);
+        return;
+      }
+
+      frame.classList.add("is-loading");
+      const photo = document.createElement("img");
+      photo.alt = "Photo of " + recipe.name;
+      photo.decoding = "async";
+
+      photo.addEventListener("load", function () {
+        frame.classList.remove("is-loading");
+      });
+
+      // Ignore late errors from an older photo if the user has already moved on
+      photo.addEventListener("error", function () {
+        if (currentRecipe && currentRecipe.id === recipe.id) {
+          showFallbackArt(frame, recipe);
+        }
+      });
+
+      photo.src = photoUrl;
+      frame.appendChild(photo);
+    }
+
+    /* Puts a recipe on the main card */
+    function showTreat(recipe) {
+      currentRecipe = recipe;
+
+      treatIntro.textContent = INTRO_LINES[introIndex];
+      introIndex = (introIndex + 1) % INTRO_LINES.length;
+
+      renderPhoto(treatPhotoFrame, recipe);
+      treatCategory.textContent = CATEGORY_LABELS[recipe.category] +
+        (recipe.custom ? " · Your recipe" : "") +
+        (recipe.fall ? " · Fall favorite" : "");
+      treatName.textContent = recipe.name;
+      treatBlurb.textContent = recipe.blurb;
+      renderMeta(treatMeta, recipe);
+
+      // Restart the fade-in animation (removing, forcing reflow, then re-adding the class)
+      treatContent.classList.remove("fade-in");
+      void treatContent.offsetWidth;
+      treatContent.classList.add("fade-in");
+    }
+
+    /* Main action: validate preferences, then show a new matching treat */
+    function generateNewTreat() {
+      const preferences = readPreferences();
+      if (!preferences.valid) {
+        showPreferencesError(preferences.message);
+        return;
+      }
+
+      const matches = getMatchingRecipes(preferences);
+      if (matches.length === 0) {
+        showPreferencesError(buildNoMatchMessage(preferences));
+        return;
+      }
+
+      clearPreferencesError();
+      showTreat(pickRandomRecipe(matches));
+    }
+
+    /* ---------------------------------------------------------
+       7. RECIPE DIALOG
+       --------------------------------------------------------- */
+
+    /* Opens any <dialog> as a modal, with a fallback for older browsers */
+    function openDialog(dialog) {
+      if (typeof dialog.showModal === "function") {
+        dialog.showModal();
+      } else {
+        dialog.setAttribute("open", "");
+      }
+      dialog.scrollTop = 0;
+    }
+
+    function closeDialog(dialog) {
+      if (typeof dialog.close === "function") {
+        dialog.close();
+      } else {
+        dialog.removeAttribute("open");
+      }
+    }
+
+    function openRecipeDialog() {
+      if (!currentRecipe) {
+        return;
+      }
+
+      renderPhoto(recipePhotoFrame, currentRecipe);
+      recipeTitle.textContent = currentRecipe.name;
+      recipeBlurb.textContent = currentRecipe.blurb;
+      renderMeta(recipeMeta, currentRecipe);
+      renderList(recipeIngredients, currentRecipe.ingredients);
+      renderList(recipeSteps, currentRecipe.steps);
+
+      recipeTip.hidden = !currentRecipe.tip;
+      recipeTip.textContent = currentRecipe.tip ? "🍂 Baker's tip: " + currentRecipe.tip : "";
+
+      // Only recipes the visitor added can be removed
+      recipeRemoveButton.hidden = currentRecipe.custom !== true;
+      resetRemoveButton();
+
+      openDialog(recipeDialog);
+    }
+
+    function closeRecipeDialog() {
+      closeDialog(recipeDialog);
+    }
+
+    /* The remove button asks for a second tap before deleting anything */
+    function resetRemoveButton() {
+      recipeRemoveButton.dataset.confirming = "false";
+      recipeRemoveButton.textContent = "Remove this recipe";
+    }
+
+    function handleRemoveClick() {
+      if (recipeRemoveButton.dataset.confirming !== "true") {
+        recipeRemoveButton.dataset.confirming = "true";
+        recipeRemoveButton.textContent = "Tap again to remove";
+        return;
+      }
+
+      const removedName = currentRecipe.name;
+      const removedId = currentRecipe.id;
+      customRecipes = customRecipes.filter(function (recipe) { return recipe.id !== removedId; });
+      saveCustomRecipes(customRecipes);
+
+      closeRecipeDialog();
+      currentRecipe = null;
+      showSuccessMessage("Removed “" + removedName + "” from your recipes.");
+
+      // If the "My own recipes" filter is now empty, go back to showing everything
+      if (typeSelect.value === "mine" && customRecipes.length === 0) {
+        typeSelect.value = "any";
+      }
+      generateNewTreat();
+    }
+
+    /* ---------------------------------------------------------
+       8. YOUR OWN RECIPES: saving in this browser
+       Recipes are stored in localStorage, so they stay on this
+       device and browser only. If the browser blocks storage
+       (e.g. private mode), the recipe still works for this visit.
+       --------------------------------------------------------- */
+
+    /* Loads saved recipes, skipping anything damaged or incomplete */
+    function loadCustomRecipes() {
+      try {
+        const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]");
+        if (!Array.isArray(saved)) {
+          return [];
+        }
+        return saved.filter(function (recipe) {
+          return recipe &&
+            typeof recipe.id === "string" &&
+            typeof recipe.name === "string" &&
+            CATEGORY_LABELS[recipe.category] &&
+            Array.isArray(recipe.ingredients) &&
+            Array.isArray(recipe.steps);
+        }).map(function (recipe) {
+          recipe.custom = true;
+          recipe.art = recipe.art || DEFAULT_ART[recipe.category];
+          return recipe;
+        });
+      } catch (error) {
+        return [];
+      }
+    }
+
+    /* Saves the list. Returns false if the browser wouldn't allow it. */
+    function saveCustomRecipes(list) {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    /* Shows a friendly note under the card for a few seconds */
+    function showSuccessMessage(message) {
+      addSuccessMessage.textContent = message;
+      addSuccessMessage.hidden = false;
+      clearTimeout(successMessageTimer);
+      successMessageTimer = setTimeout(function () {
+        addSuccessMessage.hidden = true;
+      }, 9000);
+    }
+
+    /* ---------------------------------------------------------
+       9. POLISHING A RECIPE
+       Simple, predictable clean-up rules. They keep the baker's
+       own words and only fix formatting: capitals, bullets,
+       units, fractions, temperatures and times. Each rule records
+       what it changed so the preview can explain it.
+       --------------------------------------------------------- */
+
+    const FRACTION_SYMBOLS = {
+      "1/2": "½", "1/3": "⅓", "2/3": "⅔", "1/4": "¼", "3/4": "¾",
+      "1/8": "⅛", "3/8": "⅜", "5/8": "⅝", "7/8": "⅞"
+    };
+
+    /* Words kept lowercase inside a title (unless they come first) */
+    const SMALL_TITLE_WORDS = ["a", "an", "and", "the", "of", "with", "in", "on", "for", "or", "to", "&"];
+
+    /* Unit spellings → one short, consistent form */
+    const UNIT_RULES = [
+      { pattern: /\b(?:teaspoons?|tsps?)\b\.?/gi, replacement: "tsp" },
+      { pattern: /\b(?:tablespoons?|tbsps?|tbls?)\b\.?/gi, replacement: "tbsp" },
+      { pattern: /\bounces?\b/gi, replacement: "oz" },
+      { pattern: /\b(?:pounds?|lbs?)\b\.?/gi, replacement: "lb" },
+      { pattern: /\bgrams?\b/gi, replacement: "g" },
+      { pattern: /\b(?:milliliters?|millilitres?|mls?)\b/gi, replacement: "ml" },
+      { pattern: /([\d½⅓⅔¼¾⅛⅜⅝⅞])\s*T\b/g, replacement: "$1 tbsp" },
+      { pattern: /([\d½⅓⅔¼¾⅛⅜⅝⅞])\s*t\b/g, replacement: "$1 tsp" },
+      { pattern: /\b(cups?)\b/gi, replacement: function (word) { return word.toLowerCase(); } }
+    ];
+
+    /* Something that counts as an amount at the start of an ingredient */
+    const AMOUNT_PATTERN = /^([\d½⅓⅔¼¾⅛⅜⅝⅞]|(a|an|one|two|three|four|half|pinch|dash|handful|splash|zest|juice)\b)/i;
+
+    function collapseSpaces(text) {
+      return text.replace(/\s+/g, " ").trim();
+    }
+
+    function capitalizeFirst(text) {
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
+    /* Adds a period to sentences that don't end in punctuation */
+    function endWithPeriod(text) {
+      return /[.!?]["')]*$/.test(text) ? text : text + ".";
+    }
+
+    /* Splits a textarea into clean, non-empty lines */
+    function splitLines(text) {
+      return text.split(/\r?\n/).map(collapseSpaces).filter(function (line) { return line !== ""; });
+    }
+
+    /* Removes bullets and numbering such as "-", "•", "1.", "2)" or "Step 3:" */
+    function stripListMarker(line) {
+      return line.replace(/^(?:[-*•·–]+\s*|\d+\s*[.)](?!\d)\s*|step\s*\d+\s*[:.)-]?\s*)/i, "");
+    }
+
+    /* "1 1/2" → "1 ½" and "3/4" → "¾" */
+    function formatFractions(text) {
+      return text
+        .replace(/(\d)\s+(\d\/\d)\b/g, function (match, whole, fraction) {
+          return FRACTION_SYMBOLS[fraction] ? whole + " " + FRACTION_SYMBOLS[fraction] : match;
+        })
+        .replace(/\b(\d\/\d)\b/g, function (match, fraction) {
+          return FRACTION_SYMBOLS[fraction] || match;
+        });
+    }
+
+    function formatUnits(text) {
+      let result = text;
+      UNIT_RULES.forEach(function (rule) {
+        result = result.replace(rule.pattern, rule.replacement);
+      });
+      return result;
+    }
+
+    function roundToFive(number) {
+      return Math.round(number / 5) * 5;
+    }
+
+    /* Adds the other temperature scale: "350 degrees" → "350°F (175°C)", "180C" → "180°C (355°F)".
+       A bare number is only treated as a temperature when it has a degree sign/word or F/C after it. */
+    function formatTemperatures(text) {
+      const pattern = /(^|[^\d(.])(\d{2,3})\s*(°|º|degrees?|deg\.?)?\s*(fahrenheit|celsius|F|C)?(?![a-z])(?!\s*\()/gi;
+      return text.replace(pattern, function (match, before, numberText, degreeMark, unit) {
+        if (!degreeMark && !unit) {
+          return match;
+        }
+        const number = Number(numberText);
+        const unitLetter = unit ? unit.charAt(0).toUpperCase() : (number >= 200 ? "F" : "C");
+
+        if (unitLetter === "F" && number >= 200 && number <= 550) {
+          return before + number + "°F (" + roundToFive((number - 32) * 5 / 9) + "°C)";
+        }
+        if (unitLetter === "C" && number >= 90 && number <= 290) {
+          return before + number + "°C (" + roundToFive(number * 9 / 5 + 32) + "°F)";
+        }
+        return match;
+      });
+    }
+
+    /* "25 mins" → "25 minutes", "1 hr" → "1 hour" inside steps */
+    function formatStepTimes(text) {
+      return text
+        .replace(/(\d+)\s*(?:mins?|minutes?)\b\.?/gi, function (match, amount) {
+          return amount + (amount === "1" ? " minute" : " minutes");
+        })
+        .replace(/(\d+)\s*(?:hrs?|hours?)\b\.?/gi, function (match, amount) {
+          return amount + (amount === "1" ? " hour" : " hours");
+        });
+    }
+
+    /* Short form for the time pill: "45 minutes" → "45 min", "1 hour 10 mins" → "1 hr 10 min" */
+    function formatTotalTime(text) {
+      return collapseSpaces(text.toLowerCase()
+        .replace(/\b(?:minutes?|mins?|m)\b\.?/g, "min")
+        .replace(/\b(?:hours?|hrs?|h)\b\.?/g, "hr")
+        .replace(/(\d)(min|hr)/g, "$1 $2"));
+    }
+
+    /* "grandma's APPLE crisp" → "Grandma's Apple Crisp" */
+    function formatTitle(text) {
+      return collapseSpaces(text).split(" ").map(function (word, index) {
+        const lower = word.toLowerCase();
+        if (index > 0 && SMALL_TITLE_WORDS.includes(lower)) {
+          return lower;
+        }
+        // Leave mixed-case words alone (e.g. "McIntosh")
+        const isMixedCase = word !== lower && word !== word.toUpperCase();
+        return isMixedCase ? word : capitalizeFirst(lower);
+      }).join(" ");
+    }
+
+    /* Polishes the form values into a recipe, plus notes on what changed and what to check */
+    function polishRecipe(values) {
+      const done = [];
+      const checks = [];
+      let removedMarkers = false;
+      let changedUnits = false;
+      let changedFractions = false;
+      let addedTemperatures = false;
+      let changedTimes = false;
+      let changedSentences = false;
+
+      // Name
+      const name = formatTitle(values.name);
+      if (name !== collapseSpaces(values.name)) {
+        done.push("Gave the name title-style capitals.");
+      }
+
+      // Ingredients
+      const ingredients = splitLines(values.ingredients).map(function (line) {
+        const unmarked = stripListMarker(line);
+        if (unmarked !== line) {
+          removedMarkers = true;
+        }
+        const withFractions = formatFractions(unmarked);
+        if (withFractions !== unmarked) {
+          changedFractions = true;
+        }
+        const withUnits = formatUnits(withFractions);
+        if (withUnits !== withFractions) {
+          changedUnits = true;
+        }
+        return capitalizeFirst(withUnits);
+      });
+
+      // Steps
+      const steps = splitLines(values.steps).map(function (line) {
+        const unmarked = stripListMarker(line);
+        if (unmarked !== line) {
+          removedMarkers = true;
+        }
+        const withTemperatures = formatTemperatures(unmarked);
+        if (withTemperatures !== unmarked) {
+          addedTemperatures = true;
+        }
+        const withTimes = formatStepTimes(withTemperatures);
+        if (withTimes !== withTemperatures) {
+          changedTimes = true;
+        }
+        const withUnits = formatUnits(formatFractions(withTimes));
+        const sentence = endWithPeriod(capitalizeFirst(withUnits));
+        if (sentence !== withUnits) {
+          changedSentences = true;
+        }
+        return sentence;
+      });
+
+      if (removedMarkers) {
+        done.push("Removed bullets and numbers. The steps are numbered for you.");
+      }
+      if (changedFractions) {
+        done.push("Turned fractions like 1/2 into ½.");
+      }
+      if (changedUnits) {
+        done.push("Made measurements consistent (tsp, tbsp, cup, oz, lb, g).");
+      }
+      if (addedTemperatures) {
+        done.push("Added the matching °C or °F next to oven temperatures.");
+      }
+      if (changedTimes) {
+        done.push("Spelled out cooking times.");
+      }
+      if (changedSentences) {
+        done.push("Started each step with a capital and ended it with a period.");
+      }
+
+      // Description and tip
+      let blurb = collapseSpaces(values.blurb);
+      if (blurb === "") {
+        blurb = "A homemade favorite from your own kitchen.";
+        done.push("Wrote a short description. Go back and edit it if you'd like.");
+      } else {
+        blurb = endWithPeriod(capitalizeFirst(blurb));
+      }
+      const tip = values.tip.trim() === "" ? "" : endWithPeriod(capitalizeFirst(collapseSpaces(values.tip)));
+
+      // Time and yield
+      const time = values.time.trim() === "" ? "" : formatTotalTime(values.time);
+      const recipeYield = values.yield.trim() === "" ? "" : capitalizeFirst(collapseSpaces(values.yield));
+
+      // Gentle checks for missing details
+      const allSteps = steps.join(" ");
+      const mentionsOven = /\b(bake|baking|oven|roast)\b/i.test(allSteps);
+      if (mentionsOven && !/°[FC]/.test(allSteps)) {
+        checks.push("Add an oven temperature, like “Bake at 350°F”.");
+      }
+      if (mentionsOven && !/\b(minutes?|hours?)\b/i.test(allSteps)) {
+        checks.push("Add how long it bakes, like “Bake 25–30 minutes”.");
+      }
+      const missingAmounts = ingredients.filter(function (line) {
+        return !AMOUNT_PATTERN.test(line) && !/to taste/i.test(line);
+      });
+      if (missingAmounts.length > 0) {
+        checks.push("These ingredients don't have an amount: " + missingAmounts.slice(0, 3).join(", ") +
+          (missingAmounts.length > 3 ? " and more." : "."));
+      }
+      if (time === "") {
+        checks.push("Add a total time so people can plan ahead.");
+      }
+      if (recipeYield === "") {
+        checks.push("Add how much it makes, like “12 muffins”.");
+      }
+
+      if (done.length === 0) {
+        done.push("It was already in great shape. We just laid it out as a recipe card.");
+      }
+
+      const recipe = {
+        id: "custom-" + Date.now(),
+        name: name,
+        category: values.type,
+        fall: values.fall,
+        custom: true,
+        art: DEFAULT_ART[values.type],
+        photo: values.photo.trim(),
+        blurb: blurb,
+        time: time,
+        yield: recipeYield,
+        // A simple guess at difficulty from the recipe's length
+        level: ingredients.length <= 8 && steps.length <= 6 ? "Easy" : "Medium",
+        ingredients: ingredients,
+        steps: steps,
+        tip: tip
+      };
+
+      return { recipe: recipe, done: done, checks: checks };
+    }
+
+    /* ---------------------------------------------------------
+       10. ADD-RECIPE FORM
+       Step 1 validates the form and shows clear messages next to
+       each field. Step 2 shows the polished preview to confirm.
+       --------------------------------------------------------- */
+
+    function readAddForm() {
+      return {
+        name: ADD_FIELDS.name.value,
+        type: ADD_FIELDS.type.value,
+        fall: ADD_FIELDS.fall.checked,
+        blurb: ADD_FIELDS.blurb.value,
+        time: ADD_FIELDS.time.value,
+        yield: ADD_FIELDS.yield.value,
+        ingredients: ADD_FIELDS.ingredients.value,
+        steps: ADD_FIELDS.steps.value,
+        tip: ADD_FIELDS.tip.value,
+        photo: ADD_FIELDS.photo.value
+      };
+    }
+
+    function isValidPhotoLink(text) {
+      try {
+        const url = new URL(text);
+        return url.protocol === "https:" || url.protocol === "http:";
+      } catch (error) {
+        return false;
+      }
+    }
+
+    /* Returns an object of { fieldName: "message" } for every problem found */
+    function validateAddForm(values) {
+      const errors = {};
+      const name = collapseSpaces(values.name);
+      const ingredientLines = splitLines(values.ingredients);
+      const stepLines = splitLines(values.steps);
+
+      if (name === "") {
+        errors.name = "Please give your recipe a name.";
+      } else if (name.length < 3 || !/[a-z]/i.test(name)) {
+        errors.name = "The name needs at least 3 characters, including letters.";
+      } else {
+        const polishedName = formatTitle(name).toLowerCase();
+        const taken = getAllRecipes().some(function (recipe) {
+          return recipe.name.toLowerCase() === polishedName;
+        });
+        if (taken) {
+          errors.name = "There's already a recipe called “" + formatTitle(name) + "”. Try a different name.";
+        }
+      }
+
+      if (!CATEGORY_LABELS[values.type]) {
+        errors.type = "Please choose what kind of treat it is.";
+      }
+
+      if (ingredientLines.length < 2) {
+        errors.ingredients = "Add at least 2 ingredients, each on its own line.";
+      } else if (ingredientLines.some(function (line) { return line.length > 150; })) {
+        errors.ingredients = "One ingredient line is very long. Put each ingredient on its own line.";
+      }
+
+      if (stepLines.length < 2) {
+        errors.steps = "Add at least 2 steps, each on its own line.";
+      } else if (stepLines.some(function (line) { return line.length > 500; })) {
+        errors.steps = "One step is very long. Try splitting it into shorter steps on separate lines.";
+      }
+
+      if (values.photo.trim() !== "" && !isValidPhotoLink(values.photo.trim())) {
+        errors.photo = "That doesn't look like a web link. It should start with https://";
+      }
+
+      return errors;
+    }
+
+    /* Shows or clears the message under each field */
+    function showAddFormErrors(errors) {
+      Object.keys(ADD_FIELDS).forEach(function (fieldName) {
+        const field = ADD_FIELDS[fieldName];
+        const errorElement = document.getElementById("add-" + fieldName + "-error");
+        if (!errorElement) {
+          return;
+        }
+        const message = errors[fieldName] || "";
+        errorElement.textContent = message;
+        errorElement.hidden = message === "";
+        field.setAttribute("aria-invalid", message === "" ? "false" : "true");
+      });
+
+      const problemCount = Object.keys(errors).length;
+      addFormError.hidden = problemCount === 0;
+      addFormError.textContent = problemCount === 0
+        ? ""
+        : "Please fix the " + (problemCount === 1 ? "highlighted field" : problemCount + " highlighted fields") + " above.";
+    }
+
+    /* Clears one field's message as soon as the visitor edits it */
+    function clearFieldError(fieldName) {
+      const errorElement = document.getElementById("add-" + fieldName + "-error");
+      if (errorElement && !errorElement.hidden) {
+        errorElement.hidden = true;
+        errorElement.textContent = "";
+        ADD_FIELDS[fieldName].setAttribute("aria-invalid", "false");
+      }
+    }
+
+    function showAddStep(step) {
+      addStepForm.hidden = step !== "form";
+      addStepPreview.hidden = step !== "preview";
+      addRecipeDialog.scrollTop = 0;
+    }
+
+    function openAddRecipeDialog() {
+      showAddStep("form");
+      addSaveError.hidden = true;
+      openDialog(addRecipeDialog);
+      ADD_FIELDS.name.focus();
+    }
+
+    function closeAddRecipeDialog() {
+      closeDialog(addRecipeDialog);
+    }
+
+    /* Fills the preview with the polished recipe and its notes */
+    function renderPreview(result) {
+      const recipe = result.recipe;
+
+      renderList(polishDoneList, result.done);
+      renderList(polishCheckList, result.checks);
+      polishCheckBox.hidden = result.checks.length === 0;
+
+      previewTitle.textContent = recipe.name;
+      previewBlurb.textContent = recipe.blurb;
+      renderMeta(previewMeta, recipe);
+      renderList(previewIngredients, recipe.ingredients);
+      renderList(previewSteps, recipe.steps);
+      previewTip.hidden = recipe.tip === "";
+      previewTip.textContent = recipe.tip === "" ? "" : "🍂 Baker's tip: " + recipe.tip;
+    }
+
+    function handleAddFormSubmit(event) {
+      event.preventDefault();
+      const values = readAddForm();
+      const errors = validateAddForm(values);
+      showAddFormErrors(errors);
+
+      const firstProblem = Object.keys(ADD_FIELDS).find(function (fieldName) {
+        return errors[fieldName];
+      });
+      if (firstProblem) {
+        ADD_FIELDS[firstProblem].focus();
+        return;
+      }
+
+      const result = polishRecipe(values);
+      pendingRecipe = result.recipe;
+      renderPreview(result);
+      addSaveError.hidden = true;
+      showAddStep("preview");
+      previewHeading.focus();
+    }
+
+    function handleSaveRecipe() {
+      if (!pendingRecipe) {
+        return;
+      }
+      if (customRecipes.length >= MAX_CUSTOM_RECIPES) {
+        addSaveError.textContent = "You've reached " + MAX_CUSTOM_RECIPES +
+          " saved recipes. Remove one you don't need (open it and tap “Remove this recipe”), then try again.";
+        addSaveError.hidden = false;
+        return;
+      }
+
+      const newRecipe = pendingRecipe;
+      customRecipes.push(newRecipe);
+      const saved = saveCustomRecipes(customRecipes);
+      pendingRecipe = null;
+
+      addRecipeForm.reset();
+      showAddFormErrors({});
+      closeAddRecipeDialog();
+      clearPreferencesError();
+      showTreat(newRecipe);
+
+      showSuccessMessage(saved
+        ? "“" + newRecipe.name + "” is in your recipes. It will pop up in your random picks, or choose “My own recipes” in the filters."
+        : "“" + newRecipe.name + "” was added for this visit, but your browser blocked saving, so it will be gone when you close the page.");
+    }
+
+    /* ---------------------------------------------------------
+       11. EVENT LISTENERS
+       --------------------------------------------------------- */
+
+    /* Clicking anywhere on the page shows a new treat —
+       except on buttons, form fields, panels or while a dialog is open. */
+    document.addEventListener("click", function (event) {
+      if (recipeDialog.open || addRecipeDialog.open) {
+        return;
+      }
+      if (event.target.closest(INTERACTIVE_SELECTOR) || event.target.closest(".paper-panel")) {
+        return;
+      }
+      generateNewTreat();
+    });
+
+    recipeYesButton.addEventListener("click", openRecipeDialog);
+    recipeNoButton.addEventListener("click", generateNewTreat);
+
+    recipeCloseButton.addEventListener("click", closeRecipeDialog);
+    recipeDoneButton.addEventListener("click", closeRecipeDialog);
+    recipeRemoveButton.addEventListener("click", handleRemoveClick);
+    recipeAnotherButton.addEventListener("click", function () {
+      closeRecipeDialog();
+      generateNewTreat();
+    });
+
+    /* Clicking the dark backdrop (outside a dialog box) closes it */
+    recipeDialog.addEventListener("click", function (event) {
+      if (event.target === recipeDialog) {
+        closeRecipeDialog();
+      }
+    });
+    addRecipeDialog.addEventListener("click", function (event) {
+      if (event.target === addRecipeDialog) {
+        closeAddRecipeDialog();
+      }
+    });
+
+    /* Preferences: submitting or changing a filter shows a matching treat right away */
+    preferencesForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      generateNewTreat();
+    });
+    typeSelect.addEventListener("change", generateNewTreat);
+    fallCheckbox.addEventListener("change", generateNewTreat);
+
+    /* Clear the error as soon as the user starts fixing their input */
+    ingredientInput.addEventListener("input", clearPreferencesError);
+
+    clearPreferencesButton.addEventListener("click", function () {
+      preferencesForm.reset();
+      clearPreferencesError();
+      generateNewTreat();
+    });
+
+    /* Add-recipe flow */
+    openAddRecipeButton.addEventListener("click", openAddRecipeDialog);
+    addCloseButton.addEventListener("click", closeAddRecipeDialog);
+    addCancelButton.addEventListener("click", closeAddRecipeDialog);
+    addRecipeForm.addEventListener("submit", handleAddFormSubmit);
+    addBackButton.addEventListener("click", function () {
+      showAddStep("form");
+      ADD_FIELDS.name.focus();
+    });
+    addSaveButton.addEventListener("click", handleSaveRecipe);
+
+    Object.keys(ADD_FIELDS).forEach(function (fieldName) {
+      const eventName = fieldName === "type" || fieldName === "fall" ? "change" : "input";
+      ADD_FIELDS[fieldName].addEventListener(eventName, function () {
+        clearFieldError(fieldName);
+      });
+    });
+
+    /* ---------------------------------------------------------
+       12. START: show a random treat as soon as the page opens
+       --------------------------------------------------------- */
+    showTreat(pickRandomRecipe(getAllRecipes()));
+
+    /* ---------------------------------------------------------
+       13. FALLING LEAVES
+       A few golden leaves drift down over the tablecloth.
+       Skipped for people who prefer reduced motion, and paused
+       when the tab is hidden to save battery.
+       --------------------------------------------------------- */
+    const leafCanvas = document.getElementById("leaf-canvas");
+    const leafContext = leafCanvas.getContext("2d");
+    const LEAF_COLORS = ["#d98c24", "#c4651f", "#b8501f", "#e3a32e", "#a8432a", "#c97b2a"];
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let leaves = [];
+    let leafAnimationId = null;
+
+    function resizeLeafCanvas() {
+      const ratio = window.devicePixelRatio || 1;
+      leafCanvas.width = window.innerWidth * ratio;
+      leafCanvas.height = window.innerHeight * ratio;
+      leafContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+    }
+
+    /* Creates one leaf. startAnywhere spreads the first batch over the whole screen. */
+    function createLeaf(startAnywhere) {
+      const size = 10 + Math.random() * 14;
+      return {
+        x: Math.random() * window.innerWidth,
+        y: startAnywhere ? Math.random() * window.innerHeight : -size * 2,
+        size: size,
+        fallSpeed: 0.35 + Math.random() * 0.75,
+        swayAmount: 0.6 + Math.random() * 1.2,
+        swayPhase: Math.random() * Math.PI * 2,
+        rotation: Math.random() * Math.PI * 2,
+        spin: (Math.random() - 0.5) * 0.03,
+        flipPhase: Math.random() * Math.PI * 2,
+        color: LEAF_COLORS[Math.floor(Math.random() * LEAF_COLORS.length)],
+        opacity: 0.6 + Math.random() * 0.35
+      };
+    }
+
+    /* Draws a simple leaf: a pointed oval with a center vein */
+    function drawLeaf(leaf) {
+      // Scaling the width by a cosine makes the leaf look like it's tumbling
+      const flip = Math.cos(leaf.flipPhase);
+      leafContext.save();
+      leafContext.translate(leaf.x, leaf.y);
+      leafContext.rotate(leaf.rotation);
+      leafContext.scale(flip, 1);
+      leafContext.globalAlpha = leaf.opacity;
+
+      leafContext.beginPath();
+      leafContext.moveTo(0, -leaf.size);
+      leafContext.quadraticCurveTo(leaf.size * 0.75, -leaf.size * 0.2, 0, leaf.size);
+      leafContext.quadraticCurveTo(-leaf.size * 0.75, -leaf.size * 0.2, 0, -leaf.size);
+      leafContext.fillStyle = leaf.color;
+      leafContext.fill();
+
+      leafContext.beginPath();
+      leafContext.moveTo(0, -leaf.size * 0.85);
+      leafContext.lineTo(0, leaf.size * 1.25);
+      leafContext.strokeStyle = "rgba(90, 45, 15, 0.45)";
+      leafContext.lineWidth = 1;
+      leafContext.stroke();
+
+      leafContext.restore();
+    }
+
+    function animateLeaves() {
+      leafContext.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+      leaves.forEach(function (leaf, index) {
+        leaf.swayPhase += 0.015;
+        leaf.flipPhase += 0.02;
+        leaf.y += leaf.fallSpeed;
+        leaf.x += Math.sin(leaf.swayPhase) * leaf.swayAmount * 0.5;
+        leaf.rotation += leaf.spin;
+
+        // Recycle leaves that drift off screen
+        if (leaf.y > window.innerHeight + leaf.size * 2) {
+          leaves[index] = createLeaf(false);
+        }
+        drawLeaf(leaf);
+      });
+
+      leafAnimationId = window.requestAnimationFrame(animateLeaves);
+    }
+
+    function startLeaves() {
+      if (reduceMotion || leafAnimationId !== null) {
+        return;
+      }
+      leafAnimationId = window.requestAnimationFrame(animateLeaves);
+    }
+
+    function stopLeaves() {
+      if (leafAnimationId !== null) {
+        window.cancelAnimationFrame(leafAnimationId);
+        leafAnimationId = null;
+      }
+    }
+
+    if (!reduceMotion) {
+      resizeLeafCanvas();
+      // Fewer leaves on small screens so the page stays calm
+      const leafCount = window.innerWidth < 600 ? 10 : 18;
+      for (let i = 0; i < leafCount; i++) {
+        leaves.push(createLeaf(true));
+      }
+      startLeaves();
+      window.addEventListener("resize", resizeLeafCanvas);
+      document.addEventListener("visibilitychange", function () {
+        if (document.hidden) {
+          stopLeaves();
+        } else {
+          startLeaves();
+        }
+      });
+    }
+
+    /* ---------------------------------------------------------
+       14. PHOTO PRELOADING
+       After the page has loaded, quietly fetch the other treat
+       photos so new treats appear instantly when tapped.
+       --------------------------------------------------------- */
+    window.addEventListener("load", function () {
+      setTimeout(function () {
+        Object.keys(RECIPE_PHOTOS).forEach(function (recipeId) {
+          const preloadImage = new Image();
+          preloadImage.src = RECIPE_PHOTOS[recipeId];
+        });
+      }, 1500);
+    });
+  </script>
+</body>
+</html>
